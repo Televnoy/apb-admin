@@ -21,21 +21,11 @@
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(5px); }
-      to { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; transform: translateX(-5px); }
+      to { opacity: 1; transform: translateX(0); }
     }
-    @keyframes fadeOut {
-      from { opacity: 1; transform: translateY(0); }
-      to { opacity: 0; transform: translateY(-5px); }
-    }
-    .event-enter {
-      animation: fadeIn 0.3s ease-out forwards;
-    }
-    .event-exit {
-      animation: fadeOut 0.3s ease-in forwards;
-    }
-    body {
-      min-height: 100vh; /* обеспечиваем возможность скролла */
+    .event-text {
+      animation: fadeIn 0.3s ease-out;
     }
   </style>
 </head>
@@ -69,7 +59,7 @@
         year: new Date().getFullYear()
       });
       const [selectedDay, setSelectedDay] = React.useState(null);
-      const [events, setEvents] = React.useState([]);
+      const [currentEvent, setCurrentEvent] = React.useState(null); // { id, text }
       const [modalMedia, setModalMedia] = React.useState(null);
       const [aiAnalysis, setAiAnalysis] = React.useState("");
       const [isAnalyzing, setIsAnalyzing] = React.useState(false);
@@ -80,33 +70,23 @@
       
       const scrollRef = React.useRef(null);
       const calendarRef = React.useRef(null);
-      const timersRef = React.useRef(new Map());
+      const eventTimeoutRef = React.useRef(null);
 
+      // Показ события с автоматическим скрытием через 30 секунд
+      const showEvent = (text) => {
+        if (eventTimeoutRef.current) clearTimeout(eventTimeoutRef.current);
+        setCurrentEvent({ id: Date.now(), text });
+        eventTimeoutRef.current = setTimeout(() => {
+          setCurrentEvent(null);
+        }, 30000);
+      };
+
+      // Очистка таймера при размонтировании
       React.useEffect(() => {
         return () => {
-          timersRef.current.forEach((timers, id) => {
-            clearTimeout(timers.exitTimer);
-            clearTimeout(timers.removeTimer);
-          });
+          if (eventTimeoutRef.current) clearTimeout(eventTimeoutRef.current);
         };
       }, []);
-
-      const addEvent = (text) => {
-        const id = Date.now() + Math.random();
-        const newEvent = { id, text, exiting: false };
-        setEvents(prev => [newEvent, ...prev]);
-
-        const exitTimer = setTimeout(() => {
-          setEvents(prev => prev.map(e => e.id === id ? { ...e, exiting: true } : e));
-          const removeTimer = setTimeout(() => {
-            setEvents(prev => prev.filter(e => e.id !== id));
-            timersRef.current.delete(id);
-          }, 300);
-          timersRef.current.set(id, { exitTimer, removeTimer });
-        }, 60000);
-
-        timersRef.current.set(id, { exitTimer, removeTimer: null });
-      };
 
       React.useEffect(() => {
         window.addEventListener('beforeinstallprompt', (e) => {
@@ -132,6 +112,7 @@
         if (outcome === 'accepted') setDeferredPrompt(null);
       };
 
+      // Подписка на Firestore
       React.useEffect(() => {
         const unsubscribe = db.collection('evaluations').onSnapshot((snapshot) => {
           const evaluations = [];
@@ -146,10 +127,10 @@
             newEvals.forEach(item => {
               const judge = item.judgeName || 'Судья';
               const participantNumbers = item.participants?.map(p => p.number).join(', ') || '—';
-              addEvent(`${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`);
+              showEvent(`${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`);
             });
           } else {
-            addEvent('Данные загружены');
+            showEvent('Данные загружены');
           }
           
           if (evaluations.length > 0) {
@@ -179,6 +160,7 @@
         }
       });
 
+      // Фильтрация по дате
       const getFilteredByDate = () => {
         return data.filter(item => {
           if (!item.timestamp) return false;
@@ -189,6 +171,7 @@
         });
       };
 
+      // Плоский список для потока
       const getFlatList = () => {
         const list = [];
         const filteredData = getFilteredByDate();
@@ -214,6 +197,7 @@
         return list;
       };
 
+      // Агрегированные данные для итогов
       const getAggregatedRanked = () => {
         const filteredData = getFilteredByDate();
         const groups = {};
@@ -289,6 +273,7 @@
         return Array.from(days).sort((a, b) => a - b);
       };
 
+      // --- Функция для YandexGPT ---
       const analyzeComments = async (target, mode) => {
         setIsAnalyzing(true);
         setAiAnalysis("");
@@ -430,30 +415,20 @@
             </div>
           )}
 
-          {/* ЧЁРНЫЙ ДАШБОРД С ЛЕНТОЙ СОБЫТИЙ */}
+          {/* КРУГЛЫЙ ДАШБОРД С КОЛОКОЛЬЧИКОМ И АНИМИРУЕМЫМ ТЕКСТОМ */}
           <div className="sticky top-2 z-40 w-full pt-2 pb-4 px-3 flex justify-center">
-            <div className="bg-black text-white px-5 py-3 rounded-[24px] w-fit max-w-[90vw] border border-gray-800 shadow-lg transition-all duration-300">
-              <div className="flex items-start gap-3">
-                <i data-lucide="bell" width="16" height="16" className="text-gray-400 shrink-0 mt-0.5"></i>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[7px] text-gray-400 tracking-widest uppercase mb-1">События</span>
-                  <div className="space-y-1 max-h-24 overflow-y-auto scrollbar-hide">
-                    {events.map((event) => (
-                      <div
-                        key={event.id}
-                        className={`text-[10px] text-gray-300 leading-tight border-b border-gray-800 pb-1 last:border-0 ${
-                          event.exiting ? 'event-exit' : 'event-enter'
-                        }`}
-                      >
-                        {event.text}
-                      </div>
-                    ))}
-                    {events.length === 0 && (
-                      <div className="text-[9px] text-gray-500 italic">Нет новых событий</div>
-                    )}
-                  </div>
-                </div>
+            <div
+              className="bg-black text-white rounded-full flex items-center overflow-hidden transition-all duration-300 ease-in-out"
+              style={{ maxWidth: currentEvent ? '500px' : '40px' }}
+            >
+              <div className="p-2 flex-shrink-0">
+                <i data-lucide="bell" width="16" height="16" className="text-gray-400"></i>
               </div>
+              {currentEvent && (
+                <div className="whitespace-nowrap overflow-hidden text-ellipsis mr-3 text-[11px] font-medium event-text">
+                  {currentEvent.text}
+                </div>
+              )}
             </div>
           </div>
 
@@ -770,16 +745,6 @@
           .catch(err => console.log('SW registration failed:', err));
       });
     }
-
-    // Скрытие адресной строки на мобильных устройствах
-    (function() {
-      if (window.matchMedia('(display-mode: browser)').matches) {
-        // Небольшая задержка для уверенности, что страница отрисовалась
-        setTimeout(() => {
-          window.scrollTo(0, 1);
-        }, 100);
-      }
-    })();
   </script>
 </body>
 </html>
