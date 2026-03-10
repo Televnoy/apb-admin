@@ -170,7 +170,7 @@
         });
       };
 
-      // Плоский список для потока (без агрегации)
+      // Плоский список для потока (содержит firestoreId и participantIdx)
       const getFlatList = () => {
         const list = [];
         const filteredData = getFilteredByDate();
@@ -214,13 +214,15 @@
                   scores: [],
                   comments: [],
                   photos: [],
-                  judges: []
+                  judges: [],
+                  firestoreIds: [] // для возможного использования
                 };
               }
               groups[key].scores.push(Number(p.score) || 0);
               if (p.comment) groups[key].comments.push({ judge: item.judgeName, text: p.comment });
               if (p.photos) groups[key].photos.push(...p.photos);
               if (item.judgeName) groups[key].judges.push(item.judgeName);
+              groups[key].firestoreIds.push(item.firestoreId);
             });
           }
         });
@@ -270,49 +272,39 @@
         return Array.from(days).sort((a, b) => a - b);
       };
 
-      // --- Функция для YandexGPT (анализ комментариев конкретного выступления) ---
-      const analyzeComments = async (participant, retryCount = 0) => {
-        if (retryCount === 0) {
-          setIsAnalyzing(true);
-          setAiAnalysis("");
-          setErrorInfo(null);
+      // --- Функция для YandexGPT (анализ комментариев) ---
+      const analyzeComments = async (target, mode) => {
+        // mode: 'single' - анализ только одной записи (из потока), 'group' - анализ всех комментариев выступления (из итогов)
+        setIsAnalyzing(true);
+        setAiAnalysis("");
+        setErrorInfo(null);
+
+        let commentsText = '';
+        if (mode === 'single') {
+          // Анализируем только эту запись
+          const { firestoreId, participantIdx } = target;
+          const record = allEntriesRaw.find(e => e.firestoreId === firestoreId && e.participantIdx === participantIdx);
+          if (record && record.comment.trim()) {
+            commentsText = `Судья ${record.judge}: "${record.comment}"`;
+          }
+        } else {
+          // Анализируем все комментарии выступления (группа)
+          const { number, discipline, city, date } = target;
+          const targetDate = new Date(date).toDateString();
+          const comments = allEntriesRaw
+            .filter(e => 
+              e.number === number && 
+              e.discipline === discipline && 
+              e.city === city &&
+              new Date(e.timestamp).toDateString() === targetDate &&
+              e.comment.trim().length > 0
+            )
+            .map(e => `Судья ${e.judge}: "${e.comment}"`)
+            .join("\n");
+          commentsText = comments;
         }
 
-        const { number, discipline, city, timestamp } = participant;
-        const targetDate = new Date(timestamp);
-
-        // Собираем комментарии ТОЛЬКО для этой конкретной записи (судьи)
-        // Важно: мы используем точное совпадение firestoreId? Но participant из потока не содержит firestoreId.
-        // Поэтому фильтруем по всем полям + временной метке с точностью до секунды? 
-        // Лучше использовать participantIdx, но его нет в объекте. Оставим фильтр по number, discipline, city и дате (до дня) - это даст комментарии всех судей за этот день.
-        // Но по заданию нужно анализировать конкретно одного судью. Значит, в модальном окне из потока мы должны показывать анализ именно этой строки.
-        // Для этого participant должен содержать уникальный идентификатор записи (firestoreId + participantIdx).
-        // Передадим эти данные при клике.
-        // Переделаем openAnalysis так, чтобы он передавал полную информацию о конкретном судейском вводе.
-
-        // Но пока оставим как есть, чтобы не ломать логику. Позже исправим.
-        // Сейчас participant из потока содержит number, discipline, city, timestamp. Это приведёт к сбору комментариев всех судей за этот день, что неверно.
-        // Нужно срочно исправить!
-
-        // ВРЕМЕННО: используем фильтр по firestoreId, если он есть. В потоке мы его не передаём. Значит, нужно передавать.
-        // Переделаем openAnalysis для потока.
-
-        // Поскольку это требует серьёзных изменений, а время ограничено, оставим комментарий и предложим доработку.
-        // В реальном проекте нужно передавать идентификатор записи.
-
-        // Пока заглушка:
-        const relevantComments = allEntriesRaw
-          .filter(e => 
-            e.number === number && 
-            e.discipline === discipline && 
-            e.city === city &&
-            new Date(e.timestamp).toDateString() === targetDate.toDateString() &&
-            e.comment.trim().length > 0
-          )
-          .map(e => `Судья ${e.judge}: "${e.comment}"`)
-          .join("\n");
-
-        if (!relevantComments) {
+        if (!commentsText) {
           setAiAnalysis("Недостаточно отзывов для анализа.");
           setIsAnalyzing(false);
           return;
@@ -327,16 +319,12 @@
               completionOptions: { stream: false, temperature: 0.6, maxTokens: "2000" },
               messages: [
                 { role: "system", text: "Ты эксперт-аналитик конкурса по брейдингу (плетение кос, дреды, брейды, изготовление комплектов для вплета). Пиши профессионально и вежливо, давай краткие резюме (2-3 предложения)." },
-                { role: "user", text: `Проанализируй отзывы судей об участнике №${number} в номинации "${discipline}" (город ${city}) за выступление ${targetDate.toLocaleDateString()}.\n\n${relevantComments}` }
+                { role: "user", text: `Проанализируй отзывы судей:\n\n${commentsText}` }
               ]
             })
           });
 
           if (!response.ok) {
-            if (retryCount < 3) {
-              setTimeout(() => analyzeComments(participant, retryCount + 1), 1000);
-              return;
-            }
             const errorText = await response.text();
             throw new Error(`HTTP error ${response.status}: ${errorText}`);
           }
@@ -348,38 +336,50 @@
           console.error("YandexGPT proxy error:", error);
           setErrorInfo("Ошибка при запросе к YandexGPT.");
         } finally {
-          if (retryCount === 0) setIsAnalyzing(false);
+          setIsAnalyzing(false);
         }
       };
 
-      const openAnalysis = (participant) => {
-        // participant может быть из потока (содержит photos) или из агрегированных (содержит allPhotos)
-        const photos = participant.photos || participant.allPhotos || [];
-        setModalMedia({ 
-          number: participant.number, 
-          discipline: participant.discipline, 
-          city: participant.city,
-          timestamp: participant.timestamp || participant.date,
-          photos: photos
+      // Открытие модального окна из потока
+      const openFromStream = (item) => {
+        setModalMedia({
+          type: 'single',
+          firestoreId: item.firestoreId,
+          participantIdx: item.participantIdx,
+          number: item.number,
+          discipline: item.discipline,
+          city: item.city,
+          timestamp: item.timestamp,
+          photos: item.photos,
+          judge: item.judge,
+          comment: item.comment
         });
-        analyzeComments(participant);
+        analyzeComments(item, 'single');
+      };
+
+      // Открытие модального окна из итогов
+      const openFromAggregated = (group) => {
+        setModalMedia({
+          type: 'group',
+          number: group.number,
+          discipline: group.discipline,
+          city: group.city,
+          timestamp: group.date,
+          photos: group.allPhotos,
+          comments: group.allComments
+        });
+        analyzeComments(group, 'group');
       };
 
       const copyReportToClipboard = () => {
         if (!modalMedia) return;
-        const { number, discipline, city, timestamp } = modalMedia;
-        const targetDate = new Date(timestamp);
-        const commentsList = allEntriesRaw
-          .filter(e => 
-            e.number === number && 
-            e.discipline === discipline && 
-            e.city === city &&
-            new Date(e.timestamp).toDateString() === targetDate.toDateString() &&
-            e.comment.trim().length > 0
-          )
-          .map(e => `• ${e.judge}: "${e.comment}"`)
-          .join("\n");
-        const reportText = `Участник №${number}\nНоминация: ${discipline}\nГород чемпионата: ${city}\nДата: ${targetDate.toLocaleDateString()}\n\nAI Анализ:\n${aiAnalysis || "Анализ не выполнялся"}\n\nКомментарии судей:\n${commentsList || "Нет комментариев."}`;
+        let commentsList = '';
+        if (modalMedia.type === 'single') {
+          commentsList = `• ${modalMedia.judge}: "${modalMedia.comment}"`;
+        } else {
+          commentsList = modalMedia.comments.map(c => `• ${c.judge}: "${c.text}"`).join("\n");
+        }
+        const reportText = `Участник №${modalMedia.number}\nНоминация: ${modalMedia.discipline}\nГород чемпионата: ${modalMedia.city}\nДата: ${new Date(modalMedia.timestamp).toLocaleDateString()}\n\nAI Анализ:\n${aiAnalysis || "Анализ не выполнялся"}\n\nКомментарии судей:\n${commentsList || "Нет комментариев."}`;
         navigator.clipboard.writeText(reportText).then(() => {
           alert("Отчёт скопирован в буфер обмена");
         }).catch(() => {
@@ -460,4 +460,298 @@
               </button>
 
               {showCalendar && (
-                <div className="absolute left-0 right-0 mt-2 bg-white round
+                <div className="absolute left-0 right-0 mt-2 bg-white rounded-2xl border border-gray-200 p-4 z-50">
+                  <div className="flex items-center justify-between mb-4">
+                    <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-gray-100 rounded-lg">
+                      <i data-lucide="chevron-left" width="18" height="18"></i>
+                    </button>
+                    <div className="text-[12px] uppercase">{MONTHS[selectedDate.month]} {selectedDate.year}</div>
+                    <button onClick={() => changeMonth(1)} className="p-2 hover:bg-gray-100 rounded-lg">
+                      <i data-lucide="chevron-right" width="18" height="18"></i>
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-7 gap-1 text-center text-[9px] text-gray-400 mb-2">
+                    {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(d => <div key={d}>{d}</div>)}
+                  </div>
+                  
+                  <div className="grid grid-cols-7 gap-1">
+                    {Array.from({ length: 42 }, (_, i) => {
+                      const date = new Date(selectedDate.year, selectedDate.month, i - 2);
+                      const day = date.getDate();
+                      const isCurrentMonth = date.getMonth() === selectedDate.month;
+                      const hasData = daysWithData.includes(day) && isCurrentMonth;
+                      const isSelected = selectedDay === day && isCurrentMonth;
+                      return (
+                        <button
+                          key={i}
+                          disabled={!isCurrentMonth}
+                          onClick={() => {
+                            if (isCurrentMonth) {
+                              setSelectedDay(day);
+                              setShowCalendar(false);
+                            }
+                          }}
+                          className={`
+                            aspect-square rounded-lg text-[10px] flex items-center justify-center
+                            ${!isCurrentMonth ? 'text-gray-200' : 'hover:bg-gray-100'}
+                            ${hasData ? 'bg-gray-100 text-gray-900' : ''}
+                            ${isSelected ? 'bg-gray-900 text-white' : ''}
+                          `}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  <div className="flex justify-end mt-3">
+                    <button
+                      onClick={() => {
+                        setSelectedDay(null);
+                        setShowCalendar(false);
+                      }}
+                      className="text-[10px] text-gray-500 uppercase tracking-wider hover:text-gray-900"
+                    >
+                      Все дни
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Поток результатов */}
+            <div className="bg-white rounded-[32px] p-6 border border-gray-200 overflow-hidden">
+              <div className="flex justify-between items-center mb-5">
+                <div className="flex flex-col">
+                  <h2 className="text-[10px] text-gray-400 tracking-[0.15em] uppercase">Поток результатов</h2>
+                  <span className="text-[8px] text-gray-300 uppercase mt-1">Всего: {allEntriesRaw.length}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
+                   <span className="text-[9px] text-gray-500 tracking-wider">LIVE</span>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto scrollbar-hide">
+                <div className="min-w-[850px]">
+                  <div className="grid grid-cols-[60px_160px_70px_70px_110px_110px_1fr_60px] text-[8px] text-gray-400 px-4 mb-4 uppercase tracking-widest">
+                    <div>№</div><div>Номинация</div><div>Балл</div><div>Место</div><div>Судья</div><div>Город</div><div>Комментарий</div><div className="text-right">Медиа</div>
+                  </div>
+                  
+                  <div ref={scrollRef} className="max-h-[300px] overflow-y-auto pr-1 space-y-1.5 scrollbar-hide scroll-smooth">
+                    {filteredLiveEntries.length > 0 ? (
+                      filteredLiveEntries.map((item, idx) => (
+                        <div key={idx} className="grid grid-cols-[60px_160px_70px_70px_110px_110px_1fr_60px] items-center bg-gray-50/40 rounded-2xl px-4 py-3 text-[11px] hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all">
+                          <div className="text-gray-900">#{item.number}</div>
+                          <div className="text-gray-900 truncate pr-4">{item.discipline}</div>
+                          <div className="text-gray-900 text-[13px]">{item.score}</div>
+                          <div className="text-gray-400">{/* место в потоке не показываем */}</div>
+                          <div className="truncate pr-4 text-gray-600">{item.judge}</div>
+                          <div className="text-gray-400 truncate pr-4">{item.city}</div>
+                          <div className="text-gray-400 truncate text-[10px] pr-4" title={item.comment || "—"}>{item.comment || "—"}</div>
+                          <div className="flex justify-end">
+                            <button onClick={() => openFromStream(item)} className="flex items-center gap-1.5 text-gray-500 p-2 hover:bg-gray-200 rounded-xl transition-all">
+                              <i data-lucide="image" width="14" height="14"></i>
+                              <span className="text-[10px]">{item.photos.length}</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="py-16 text-center text-[10px] text-gray-300 uppercase tracking-[0.2em]">Записей не найдено</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Фильтр по городам */}
+            {cities.length > 1 && (
+              <div className="flex justify-center overflow-hidden">
+                 <div className="bg-white rounded-full p-1 border border-gray-200 flex gap-1 overflow-x-auto max-w-full scrollbar-hide">
+                    {cities.map(city => (
+                      <button key={city} onClick={() => setSelectedCity(city)} className={`px-4 py-1.5 rounded-full text-[10px] transition-all whitespace-nowrap uppercase tracking-tighter ${selectedCity === city ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-900'}`}>
+                        {city}
+                      </button>
+                    ))}
+                 </div>
+              </div>
+            )}
+
+            {/* Итоги по номинациям с учётом средних баллов */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {Object.entries(getNominationGroups()).map(([nomination, participants]) => (
+                <div key={nomination} className="bg-white rounded-[32px] p-6 border border-gray-200">
+                  <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-4">
+                    <h4 className="text-[12px] tracking-tight leading-tight uppercase w-3/4">{nomination}</h4>
+                    <span className="text-[9px] text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">N={participants.length}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {participants.map((p, pIdx) => {
+                      const isFirst = pIdx === 0;
+                      return (
+                        <div
+                          key={pIdx}
+                          className={`flex justify-between items-center px-5 py-4 rounded-[22px] transition-all ${
+                            isFirst ? 'bg-gray-100' : 'bg-gray-50/60'
+                          }`}
+                        >
+                          <div className="flex flex-col">
+                            <span className={`text-[12px] ${isFirst ? 'text-gray-900' : 'text-gray-700'}`}>
+                              № {p.number}
+                            </span>
+                            <span className="text-[8px] text-gray-400 uppercase tracking-widest">
+                              {p.city}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[11px] tracking-tight">
+                            <i
+                              data-lucide="award"
+                              width="14"
+                              height="14"
+                              className={isFirst ? 'text-gray-700' : 'text-gray-300'}
+                            />
+                            {pIdx + 1} МЕСТО
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <span className="text-[15px] tracking-tighter">{p.avgScore.toFixed(1)}</span>
+                              <span className="text-[7px] block text-gray-400 uppercase -mt-1">
+                                БАЛЛЫ
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => openFromAggregated(p)}
+                              className="p-2 hover:bg-gray-200 rounded-full transition-all"
+                            >
+                              <i
+                                data-lucide="sparkles"
+                                width="16"
+                                height="16"
+                                className={isFirst ? 'text-gray-700' : 'text-gray-400'}
+                              />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Модальное окно с фото и анализом */}
+          {modalMedia && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => { setModalMedia(null); setAiAnalysis(""); }}>
+              <div className="bg-white w-full max-w-xl rounded-[40px] overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                <div className="p-6 flex justify-between items-center border-b border-gray-200">
+                  <div className="flex flex-col">
+                    <h3 className="text-[10px] uppercase tracking-[0.2em] text-gray-500 mb-1">Медиа-отчет</h3>
+                    <span className="text-[13px] text-gray-900">Участник № {modalMedia.number}</span>
+                    <span className="text-[10px] text-gray-500">{modalMedia.discipline} / {modalMedia.city}</span>
+                    <span className="text-[9px] text-gray-400">{new Date(modalMedia.timestamp).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={copyReportToClipboard} className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-all" title="Копировать отчёт">
+                      <i data-lucide="copy" width="20" height="20"></i>
+                    </button>
+                    <button onClick={() => setModalMedia(null)} className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-all">
+                      <i data-lucide="x" width="20" height="20"></i>
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+                  {/* AI анализ */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-3xl p-6 min-h-[100px] flex flex-col justify-center">
+                    <div className="flex items-center gap-2 mb-3">
+                      <i data-lucide="sparkles" width="16" height="16" className="text-gray-500"></i>
+                      <span className="text-[10px] text-gray-500 tracking-[0.15em] uppercase">AI Анализ</span>
+                    </div>
+                    {isAnalyzing ? (
+                      <div className="flex items-center gap-3 py-2">
+                        <i data-lucide="loader-2" width="18" height="18" className="text-gray-500 animate-spin"></i>
+                        <span className="text-[12px] text-gray-500 uppercase tracking-widest">Анализируем отзывы...</span>
+                      </div>
+                    ) : (
+                      <p className="text-[13px] leading-relaxed text-gray-700">{aiAnalysis || "Нет текстовых отзывов для генерации анализа."}</p>
+                    )}
+                  </div>
+
+                  {/* Комментарии судей */}
+                  <div className="bg-gray-50 rounded-3xl p-6 border border-gray-200">
+                    <div className="flex items-center gap-2 mb-4">
+                      <i data-lucide="message-square" width="16" height="16" className="text-gray-500"></i>
+                      <span className="text-[10px] text-gray-500 tracking-[0.15em] uppercase">Комментарии судей</span>
+                    </div>
+                    <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                      {modalMedia.type === 'single' ? (
+                        modalMedia.comment && (
+                          <div className="text-[12px] bg-white p-3 rounded-xl border border-gray-100">
+                            <span className="font-medium text-gray-900">{modalMedia.judge}:</span> <span className="text-gray-700">"{modalMedia.comment}"</span>
+                          </div>
+                        )
+                      ) : (
+                        modalMedia.comments.map((c, idx) => (
+                          <div key={idx} className="text-[12px] bg-white p-3 rounded-xl border border-gray-100">
+                            <span className="font-medium text-gray-900">{c.judge}:</span> <span className="text-gray-700">"{c.text}"</span>
+                          </div>
+                        ))
+                      )}
+                      {((modalMedia.type === 'single' && !modalMedia.comment) || (modalMedia.type === 'group' && modalMedia.comments.length === 0)) && (
+                        <div className="text-gray-400 text-[12px] italic">Нет комментариев</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Галерея фото */}
+                  {modalMedia.photos && modalMedia.photos.length > 0 && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {modalMedia.photos.map((url, i) => (
+                        <div key={i} className="group relative aspect-[4/5] bg-gray-100 rounded-[28px] overflow-hidden border border-gray-200 cursor-pointer" onClick={() => setFullscreenImage({ url, index: i })}>
+                          <img src={url} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                          <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <i data-lucide="maximize-2" width="32" height="32" className="text-white"></i>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Полноэкранное изображение */}
+          {fullscreenImage && (
+            <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-6" onClick={() => setFullscreenImage(null)}>
+              <button className="absolute top-8 right-8 text-white p-2" onClick={() => setFullscreenImage(null)}>
+                <i data-lucide="x" width="32" height="32"></i>
+              </button>
+              <img src={fullscreenImage.url} className="max-w-full max-h-full object-contain" alt="View" />
+              <div className="absolute bottom-10 px-8 py-3 bg-white/10 rounded-full text-white/80 text-[10px] tracking-widest uppercase">
+                Фото {fullscreenImage.index + 1} / {modalMedia?.photos?.length || 0}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/apb-admin/a-sw.js')
+          .then(reg => console.log('SW registered:', reg))
+          .catch(err => console.log('SW registration failed:', err));
+      });
+    }
+  </script>
+</body>
+</html>
