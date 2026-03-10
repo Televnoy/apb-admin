@@ -59,14 +59,27 @@
       const [errorInfo, setErrorInfo] = React.useState(null);
       const [fullscreenImage, setFullscreenImage] = React.useState(null);
       const [deferredPrompt, setDeferredPrompt] = React.useState(null);
+      const [showCalendar, setShowCalendar] = React.useState(false); // состояние для выпадающего календаря
       
       const scrollRef = React.useRef(null);
+      const calendarRef = React.useRef(null);
 
       React.useEffect(() => {
         window.addEventListener('beforeinstallprompt', (e) => {
           e.preventDefault();
           setDeferredPrompt(e);
         });
+      }, []);
+
+      // Закрытие календаря при клике вне его
+      React.useEffect(() => {
+        const handleClickOutside = (event) => {
+          if (calendarRef.current && !calendarRef.current.contains(event.target)) {
+            setShowCalendar(false);
+          }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
       }, []);
 
       const handleInstallClick = async () => {
@@ -301,6 +314,11 @@
 
       const daysWithData = getDaysWithData();
 
+      // Формируем текст для отображения на кнопке
+      const dateDisplay = selectedDay 
+        ? `${selectedDay} ${MONTHS[selectedDate.month]} ${selectedDate.year}`
+        : `${MONTHS[selectedDate.month]} ${selectedDate.year}`;
+
       if (loading) return (
         <div className="min-h-screen bg-white flex items-center justify-center">
           <div className="text-black animate-pulse font-black text-[10px] uppercase tracking-[0.2em]">Загрузка данных...</div>
@@ -329,46 +347,78 @@
 
           <div className="max-w-5xl mx-auto px-4 space-y-5 mt-2">
             
-            {/* КОМПАКТНЫЙ БЛОК ВЫБОРА ДАТЫ */}
-            <div className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm">
-              <div className="flex items-center justify-between gap-2">
+            {/* КОМПАКТНЫЙ ВЫПАДАЮЩИЙ КАЛЕНДАРЬ */}
+            <div className="relative" ref={calendarRef}>
+              <button
+                onClick={() => setShowCalendar(!showCalendar)}
+                className="w-full bg-white rounded-2xl p-3 border border-gray-100 shadow-sm flex items-center justify-between"
+              >
                 <div className="flex items-center gap-2 text-gray-400">
                   <i data-lucide="calendar" width="16" height="16"></i>
-                  <span className="text-[9px] font-black uppercase tracking-widest">Архив</span>
+                  <span className="text-[9px] font-black uppercase tracking-widest">Дата:</span>
                 </div>
-                <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-2 py-1 border border-gray-100">
-                  <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-white hover:shadow-sm rounded-lg transition-all text-gray-600">
-                    <i data-lucide="chevron-left" width="16" height="16"></i>
-                  </button>
-                  <div className="flex flex-col items-center min-w-[80px]">
-                    <span className="text-[10px] font-black uppercase tracking-tight leading-tight">{MONTHS[selectedDate.month]}</span>
-                    <span className="text-[7px] font-black text-[#3171af] tracking-widest -mt-0.5">{selectedDate.year}</span>
-                  </div>
-                  <button onClick={() => changeMonth(1)} className="p-1 hover:bg-white hover:shadow-sm rounded-lg transition-all text-gray-600">
-                    <i data-lucide="chevron-right" width="16" height="16"></i>
-                  </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-black">{dateDisplay}</span>
+                  <i data-lucide="chevron-down" width="14" height="14" className={`text-gray-400 transition-transform ${showCalendar ? 'rotate-180' : ''}`}></i>
                 </div>
-              </div>
+              </button>
 
-              {/* Дни с данными — компактный список */}
-              {daysWithData.length > 0 && (
-                <div className="flex justify-start mt-2 overflow-hidden">
-                  <div className="bg-gray-50 rounded-full p-1 flex gap-0.5 overflow-x-auto max-w-full scrollbar-hide">
-                    <button
-                      onClick={() => setSelectedDay(null)}
-                      className={`px-3 py-1 rounded-full text-[8px] font-black transition-all whitespace-nowrap uppercase tracking-tighter ${selectedDay === null ? 'bg-black text-white' : 'text-gray-400 hover:bg-gray-200'}`}
-                    >
-                      Все
+              {showCalendar && (
+                <div className="absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-4 z-50">
+                  <div className="flex items-center justify-between mb-4">
+                    <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-gray-100 rounded-lg">
+                      <i data-lucide="chevron-left" width="18" height="18"></i>
                     </button>
-                    {daysWithData.map(day => (
-                      <button
-                        key={day}
-                        onClick={() => setSelectedDay(day)}
-                        className={`px-3 py-1 rounded-full text-[8px] font-black transition-all whitespace-nowrap uppercase tracking-tighter ${selectedDay === day ? 'bg-black text-white' : 'text-gray-400 hover:bg-gray-200'}`}
-                      >
-                        {day}
-                      </button>
-                    ))}
+                    <div className="text-[12px] font-black uppercase">{MONTHS[selectedDate.month]} {selectedDate.year}</div>
+                    <button onClick={() => changeMonth(1)} className="p-2 hover:bg-gray-100 rounded-lg">
+                      <i data-lucide="chevron-right" width="18" height="18"></i>
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-7 gap-1 text-center text-[9px] font-black text-gray-400 mb-2">
+                    {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(d => <div key={d}>{d}</div>)}
+                  </div>
+                  
+                  <div className="grid grid-cols-7 gap-1">
+                    {Array.from({ length: 42 }, (_, i) => {
+                      const date = new Date(selectedDate.year, selectedDate.month, i - 2); // примерное смещение
+                      const day = date.getDate();
+                      const isCurrentMonth = date.getMonth() === selectedDate.month;
+                      const hasData = daysWithData.includes(day) && isCurrentMonth;
+                      const isSelected = selectedDay === day && isCurrentMonth;
+                      return (
+                        <button
+                          key={i}
+                          disabled={!isCurrentMonth}
+                          onClick={() => {
+                            if (isCurrentMonth) {
+                              setSelectedDay(day);
+                              setShowCalendar(false);
+                            }
+                          }}
+                          className={`
+                            aspect-square rounded-lg text-[10px] font-medium flex items-center justify-center
+                            ${!isCurrentMonth ? 'text-gray-200' : 'hover:bg-gray-100'}
+                            ${hasData ? 'bg-blue-50 text-[#3171af] font-black' : ''}
+                            ${isSelected ? 'bg-black text-white font-black' : ''}
+                          `}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  <div className="flex justify-end mt-3">
+                    <button
+                      onClick={() => {
+                        setSelectedDay(null);
+                        setShowCalendar(false);
+                      }}
+                      className="text-[10px] font-black text-[#3171af] uppercase tracking-wider"
+                    >
+                      Все дни
+                    </button>
                   </div>
                 </div>
               )}
