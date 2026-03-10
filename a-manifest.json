@@ -1,6 +1,6 @@
 {
-  "name": "APB Admin Panel",
-  "short_name": "APB Admin",
+  "name": "АПБ Админ панель",
+  "short_name": "АПБ Админ",
   "description": "Панель управления АПБ",
   "start_url": "/apb-app/admin.html",
   "display": "standalone",
