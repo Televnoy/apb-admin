@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="APB Admin Panel – управление конкурсом" />
+  <link rel="manifest" href="/apb-admin/a-manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="/apb-admin/aapple-touch-icon.png" />
+  <title>АПБ Админ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    // Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyDSrWUBYjqYpA6CgG-tn0B2E_h9HN2wgZ8",
+      authDomain: "apbapp-862a2.firebaseapp.com",
+      projectId: "apbapp-862a2",
+      storageBucket: "apbapp-862a2.firebasestorage.app",
+      messagingSenderId: "909828829367",
+      appId: "1:909828829367:web:64aa085f80b59b95d5dd32",
+      measurementId: "G-026CEF7FKV"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const MONTHS = [
+      "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+      "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ];
+
+    function App() {
+      const [data, setData] = React.useState([]);
+      const [loading, setLoading] = React.useState(true);
+      const [selectedCity, setSelectedCity] = React.useState('Все города');
+      const [selectedDate, setSelectedDate] = React.useState({
+        month: new Date().getMonth(),
+        year: new Date().getFullYear()
+      });
+      const [lastEvent, setLastEvent] = React.useState('Ожидание обновлений...');
+      const [modalMedia, setModalMedia] = React.useState(null);
+      const [aiAnalysis, setAiAnalysis] = React.useState("");
+      const [isAnalyzing, setIsAnalyzing] = React.useState(false);
+      const [errorInfo, setErrorInfo] = React.useState(null);
+      const [fullscreenImage, setFullscreenImage] = React.useState(null);
+      const [deferredPrompt, setDeferredPrompt] = React.useState(null);
+      
+      const scrollRef = React.useRef(null);
+
+      React.useEffect(() => {
+        window.addEventListener('beforeinstallprompt', (e) => {
+          e.preventDefault();
+          setDeferredPrompt(e);
+        });
+      }, []);
+
+      const handleInstallClick = async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') setDeferredPrompt(null);
+      };
+
+      React.useEffect(() => {
+        const unsubscribe = db.collection('evaluations').onSnapshot((snapshot) => {
+          const evaluations = [];
+          snapshot.forEach((doc) => {
+            evaluations.push({ firestoreId: doc.id, ...doc.data() });
+          });
+          
+          if (evaluations.length > 0) {
+            const latest = evaluations[evaluations.length - 1];
+            setLastEvent(`Судья ${latest.judgeName || '—'} оценил участника в номинации ${latest.discipline || '—'}`);
+          }
+          
+          setData(evaluations);
+          setLoading(false);
+        }, (error) => console.error("Snapshot error:", error));
+        return () => unsubscribe();
+      }, []);
+
+      React.useEffect(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      }, [data, selectedCity, selectedDate]);
+
+      React.useEffect(() => {
+        if (window.lucide) {
+          lucide.createIcons();
+        }
+      });
+
+      const getFilteredByDate = () => {
+        return data.filter(item => {
+          if (!item.timestamp) return false;
+          const date = new Date(item.timestamp);
+          return date.getMonth() === selectedDate.month && date.getFullYear() === selectedDate.year;
+        });
+      };
+
+      const getFlatList = (sortByScore = false) => {
+        const list = [];
+        const filteredData = getFilteredByDate();
+        
+        filteredData.forEach(item => {
+          if (item.participants && Array.isArray(item.participants)) {
+            item.participants.forEach((p, pIdx) => {
+              list.push({
+                firestoreId: item.firestoreId,
+                participantIdx: pIdx,
+                number: p.number || '00',
+                score: Number(p.score) || 0,
+                place: 31 - (Number(p.score) || 0),
+                judge: item.judgeName || '—',
+                city: item.city || '—',
+                comment: p.comment || '',
+                photos: p.photos || [],
+                discipline: item.discipline || '—',
+                timestamp: item.timestamp || 0
+              });
+            });
+          }
+        });
+        return sortByScore ? list.sort((a, b) => b.score - a.score) : list; 
+      };
+
+      const allEntriesRaw = getFlatList(false);
+      const allEntriesRanked = getFlatList(true);
+      const cities = ['Все города', ...new Set(allEntriesRaw.map(e => e.city))];
+      
+      const filteredLiveEntries = selectedCity === 'Все города' 
+        ? allEntriesRaw 
+        : allEntriesRaw.filter(e => e.city === selectedCity);
+
+      const getNominationGroups = () => {
+        const filteredRanked = selectedCity === 'Все города' 
+          ? allEntriesRanked 
+          : allEntriesRanked.filter(e => e.city === selectedCity);
+        const groups = {};
+        filteredRanked.forEach(p => {
+          if (!groups[p.discipline]) groups[p.discipline] = [];
+          groups[p.discipline].push(p);
+        });
+        return groups;
+      };
+
+      // --- ФУНКЦИЯ ДЛЯ YANDEXGPT ЧЕРЕЗ ПРОКСИ (с учётом номинации и города) ---
+      const analyzeComments = async (participant, retryCount = 0) => {
+        if (retryCount === 0) {
+          setIsAnalyzing(true);
+          setAiAnalysis("");
+          setErrorInfo(null);
+        }
+
+        const { number, discipline, city } = participant;
+        const relevantComments = allEntriesRaw
+          .filter(e => e.number === number && e.comment.trim().length > 0)
+          .map(e => `Судья ${e.judge}: "${e.comment}"`)
+          .join("\n");
+
+        if (!relevantComments) {
+          setAiAnalysis("Недостаточно отзывов для анализа.");
+          setIsAnalyzing(false);
+          return;
+        }
+
+        try {
+          const PROXY_URL = "https://functions.yandexcloud.net/d4ej8k6scmj9evo4us4n";
+
+          const response = await fetch(PROXY_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              completionOptions: {
+                stream: false,
+                temperature: 0.6,
+                maxTokens: "2000"
+              },
+              messages: [
+                {
+                  role: "system",
+                  text: "Ты эксперт-аналитик конкурса по брейдингу (плетение кос, дреды, брейды, изготовление комплектов для вплета). Пиши профессионально и вежливо, давай краткие резюме (2-3 предложения)."
+                },
+                {
+                  role: "user",
+                  text: `Проанализируй отзывы судей об участнике №${number} в номинации "${discipline}" (город ${city}).\n\n${relevantComments}`
+                }
+              ]
+            })
+          });
+
+          if (!response.ok) {
+            if (retryCount < 3) {
+              setTimeout(() => analyzeComments(participant, retryCount + 1), 1000);
+              return;
+            }
+            const errorText = await response.text();
+            throw new Error(`HTTP error ${response.status}: ${errorText}`);
+          }
+
+          const result = await response.json();
+          const generatedText = result.result?.alternatives?.[0]?.message?.text || "Анализ не удался.";
+          setAiAnalysis(generatedText);
+        } catch (error) {
+          console.error("YandexGPT proxy error:", error);
+          setErrorInfo("Ошибка при запросе к YandexGPT.");
+        } finally {
+          if (retryCount === 0) {
+            setIsAnalyzing(false);
+          }
+        }
+      };
+
+      // Функция для открытия анализа из блока итогов
+      const openAnalysis = (participant) => {
+        setModalMedia({ photos: participant.photos, number: participant.number, discipline: participant.discipline, city: participant.city });
+        analyzeComments(participant);
+      };
+
+      // Функция копирования отчёта в буфер обмена
+      const copyReportToClipboard = () => {
+        if (!modalMedia) return;
+        const { number, discipline, city } = modalMedia;
+        const commentsList = allEntriesRaw
+          .filter(e => e.number === number && e.comment.trim().length > 0)
+          .map(e => `• ${e.judge}: "${e.comment}"`)
+          .join("\n");
+        const reportText = `Участник №${number}\nНоминация: ${discipline}\nГород: ${city}\n\nAI Анализ:\n${aiAnalysis || "Анализ не выполнялся"}\n\nКомментарии судей:\n${commentsList || "Нет комментариев."}`;
+        navigator.clipboard.writeText(reportText).then(() => {
+          alert("Отчёт скопирован в буфер обмена");
+        }).catch(() => {
+          alert("Не удалось скопировать");
+        });
+      };
+
+      const changeMonth = (direction) => {
+        setSelectedDate(prev => {
+          let newMonth = prev.month + direction;
+          let newYear = prev.year;
+          if (newMonth > 11) { newMonth = 0; newYear++; }
+          if (newMonth < 0) { newMonth = 11; newYear--; }
+          return { month: newMonth, year: newYear };
+        });
+      };
+
+      if (loading) return (
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <div className="text-black animate-pulse font-black text-[10px] uppercase tracking-[0.2em]">Загрузка данных...</div>
+        </div>
+      );
+
+      return (
+        <div className="min-h-screen bg-[#F2F2F2] font-sans text-black select-none pb-12">
+          
+          {deferredPrompt && (
+            <div className="bg-[#3171af] text-white px-4 py-2 flex justify-between items-center text-[10px] font-bold sticky top-0 z-[60]">
+              <span>УСТАНОВИТЕ ПРИЛОЖЕНИЕ НА ГЛАВНЫЙ ЭКРАН</span>
+              <button onClick={handleInstallClick} className="bg-white text-black px-3 py-1 rounded-full text-[9px]">ДОБАВИТЬ</button>
+            </div>
+          )}
+
+          <div className="sticky top-2 z-40 w-full pt-2 pb-4 px-3 flex justify-center backdrop-blur-sm">
+            <div className="bg-black text-white px-5 py-3 rounded-[24px] shadow-2xl w-full max-w-sm flex items-center gap-3 border border-white/5">
+              <i data-lucide="sparkles" width="16" height="16" className="text-[#3171af] shrink-0"></i>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[7px] font-black text-[#3171af] tracking-widest uppercase mb-0.5">Live Status</span>
+                <span className="text-[11px] font-bold leading-tight truncate">{lastEvent}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="max-w-5xl mx-auto px-4 space-y-5 mt-2">
+            
+            <div className="flex items-center justify-between bg-white rounded-3xl p-4 border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-3 text-gray-400">
+                <i data-lucide="calendar" width="18" height="18"></i>
+                <span className="text-[10px] font-black uppercase tracking-widest">Архив событий</span>
+              </div>
+              <div className="flex items-center gap-5 bg-gray-50 rounded-2xl px-3 py-1.5 border border-gray-100">
+                <button onClick={() => changeMonth(-1)} className="p-1.5 hover:bg-white hover:shadow-sm rounded-xl transition-all text-gray-600">
+                  <i data-lucide="chevron-left" width="20" height="20"></i>
+                </button>
+                <div className="flex flex-col items-center min-w-[110px]">
+                  <span className="text-[12px] font-black uppercase tracking-tight">{MONTHS[selectedDate.month]}</span>
+                  <span className="text-[8px] font-black text-[#3171af] tracking-widest">{selectedDate.year}</span>
+                </div>
+                <button onClick={() => changeMonth(1)} className="p-1.5 hover:bg-white hover:shadow-sm rounded-xl transition-all text-gray-600">
+                  <i data-lucide="chevron-right" width="20" height="20"></i>
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-[32px] shadow-sm p-6 border border-gray-100 overflow-hidden">
+              <div className="flex justify-between items-center mb-5">
+                <div className="flex flex-col">
+                  <h2 className="text-[10px] font-black text-gray-400 tracking-[0.15em] uppercase italic">Поток результатов</h2>
+                  <span className="text-[8px] text-gray-300 font-bold uppercase mt-1">Всего: {allEntriesRaw.length}</span>
+                </div>
+                <div className="flex items-center gap-2 bg-blue-50/50 px-3 py-1 rounded-full border border-blue-100">
+                   <div className="w-1.5 h-1.5 bg-[#3171af] rounded-full animate-pulse" />
+                   <span className="text-[9px] font-black text-[#3171af] tracking-wider">LIVE</span>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto scrollbar-hide">
+                <div className="min-w-[850px]">
+                  <div className="grid grid-cols-[60px_160px_70px_70px_110px_110px_1fr_60px] text-[8px] font-black text-gray-400 px-4 mb-4 uppercase tracking-widest">
+                    <div>№</div><div>Номинация</div><div>Балл</div><div>Место</div><div>Судья</div><div>Город</div><div>Комментарий</div><div className="text-right">Медиа</div>
+                  </div>
+                  
+                  <div ref={scrollRef} className="max-h-[300px] overflow-y-auto pr-1 space-y-1.5 scrollbar-hide scroll-smooth">
+                    {filteredLiveEntries.length > 0 ? (
+                      filteredLiveEntries.map((item, idx) => (
+                        <div key={idx} className="grid grid-cols-[60px_160px_70px_70px_110px_110px_1fr_60px] items-center bg-[#F2F2F2]/40 rounded-2xl px-4 py-3 text-[11px] hover:bg-white border border-transparent hover:border-gray-100 transition-all">
+                          <div className="font-black text-black">#{item.number}</div>
+                          <div className="font-bold text-black truncate pr-4">{item.discipline}</div>
+                          <div className="font-black text-[#3171af] text-[13px]">{item.score}</div>
+                          <div className="text-gray-400 font-bold">{item.place}</div>
+                          <div className="truncate pr-4 text-gray-600 font-medium">{item.judge}</div>
+                          <div className="text-gray-400 truncate pr-4">{item.city}</div>
+                          {/* Добавлен title для полного комментария */}
+                          <div className="text-gray-400 truncate italic text-[10px] pr-4" title={item.comment || "—"}>{item.comment || "—"}</div>
+                          <div className="flex justify-end">
+                            <button onClick={() => { 
+                              const participant = { 
+                                number: item.number, 
+                                photos: item.photos, 
+                                discipline: item.discipline, 
+                                city: item.city 
+                              };
+                              setModalMedia({ photos: item.photos, number: item.number, discipline: item.discipline, city: item.city }); 
+                              analyzeComments(participant); 
+                            }} className="flex items-center gap-1.5 text-[#3171af] p-2 hover:bg-blue-50 rounded-xl transition-all">
+                              <i data-lucide="image" width="14" height="14"></i>
+                              <span className="text-[10px] font-black">{item.photos.length}</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="py-16 text-center text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] italic">Записей не найдено</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {cities.length > 1 && (
+              <div className="flex justify-center overflow-hidden">
+                 <div className="bg-white rounded-full p-1.5 border border-gray-100 flex gap-1 overflow-x-auto max-w-full scrollbar-hide shadow-sm">
+                    {cities.map(city => (
+                      <button key={city} onClick={() => setSelectedCity(city)} className={`px-5 py-2 rounded-full text-[10px] font-black transition-all whitespace-nowrap uppercase tracking-tighter ${selectedCity === city ? 'bg-black text-white' : 'text-gray-400 hover:bg-gray-50'}`}>
+                        {city}
+                      </button>
+                    ))}
+                 </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {Object.entries(getNominationGroups()).map(([nomination, participants]) => (
+                <div key={nomination} className="bg-white rounded-[32px] shadow-sm p-6 border border-gray-100">
+                  <div className="mb-4 flex items-center justify-between border-b border-gray-50 pb-4">
+                    <h4 className="text-[12px] font-black tracking-tight leading-tight uppercase w-3/4">{nomination}</h4>
+                    <span className="text-[9px] font-black text-[#3171af] bg-blue-50 px-2.5 py-1 rounded-full">N={participants.length}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {participants.map((p, pIdx) => {
+                      const isFirst = pIdx === 0;
+                      return (
+                        <div
+                          key={pIdx}
+                          className={`flex justify-between items-center px-5 py-4 rounded-[22px] transition-all ${
+                            isFirst ? 'bg-black text-white shadow-xl shadow-black/10' : 'bg-[#F2F2F2]/60'
+                          }`}
+                        >
+                          <div className="flex flex-col">
+                            <span className={`text-[12px] font-black ${isFirst ? 'text-[#3171af]' : 'text-black'}`}>
+                              № {p.number}
+                            </span>
+                            <span className="text-[8px] opacity-40 font-black uppercase tracking-widest">
+                              {p.city}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 font-black text-[11px] italic tracking-tight">
+                            <i
+                              data-lucide="award"
+                              width="14"
+                              height="14"
+                              className={isFirst ? 'text-[#3171af]' : 'text-gray-300'}
+                            />
+                            {pIdx + 1} МЕСТО
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <span className="font-black text-[15px] tracking-tighter">{p.score.toFixed(1)}</span>
+                              <span className="text-[7px] block opacity-30 font-bold tracking-widest uppercase -mt-1">
+                                БАЛЛЫ
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => openAnalysis(p)}
+                              className="p-2 hover:bg-black/10 rounded-full transition-all"
+                            >
+                              <i
+                                data-lucide="sparkles"
+                                width="16"
+                                height="16"
+                                className={isFirst ? 'text-white' : 'text-[#3171af]'}
+                              />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {modalMedia && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md" onClick={() => { setModalMedia(null); setAiAnalysis(""); }}>
+              <div className="bg-white w-full max-w-xl rounded-[40px] overflow-hidden flex flex-col max-h-[90vh] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="p-6 flex justify-between items-center border-b border-gray-50">
+                  <div className="flex flex-col">
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#3171af] mb-1">Медиа-отчет</h3>
+                    <span className="text-[13px] text-black font-black italic">Участник № {modalMedia.number}</span>
+                    <span className="text-[10px] text-gray-500 font-medium">{modalMedia.discipline} / {modalMedia.city}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={copyReportToClipboard} className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-all" title="Копировать отчёт">
+                      <i data-lucide="copy" width="20" height="20"></i>
+                    </button>
+                    <button onClick={() => setModalMedia(null)} className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-all">
+                      <i data-lucide="x" width="20" height="20"></i>
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+                  {/* Блок AI анализа */}
+                  <div className="bg-[#3171af]/5 border border-[#3171af]/10 rounded-3xl p-6 min-h-[100px] flex flex-col justify-center relative overflow-hidden">
+                    <div className="flex items-center gap-2 mb-3 relative z-10">
+                      <i data-lucide="sparkles" width="16" height="16" className="text-[#3171af]"></i>
+                      <span className="text-[10px] font-black text-[#3171af] tracking-[0.15em] uppercase">AI Анализ</span>
+                    </div>
+                    {isAnalyzing ? (
+                      <div className="flex items-center gap-3 py-2">
+                        <i data-lucide="loader-2" width="18" height="18" className="text-[#3171af] animate-spin"></i>
+                        <span className="text-[12px] text-gray-500 font-bold uppercase tracking-widest">Анализируем отзывы...</span>
+                      </div>
+                    ) : (
+                      <p className="text-[13px] leading-relaxed italic text-gray-700 font-medium relative z-10">{aiAnalysis || "Нет текстовых отзывов для генерации анализа."}</p>
+                    )}
+                  </div>
+
+                  {/* Блок комментариев судей */}
+                  <div className="bg-gray-50 rounded-3xl p-6 border border-gray-100">
+                    <div className="flex items-center gap-2 mb-4">
+                      <i data-lucide="message-square" width="16" height="16" className="text-[#3171af]"></i>
+                      <span className="text-[10px] font-black text-gray-500 tracking-[0.15em] uppercase">Комментарии судей</span>
+                    </div>
+                    <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                      {allEntriesRaw
+                        .filter(e => e.number === modalMedia.number && e.comment.trim().length > 0)
+                        .map((e, idx) => (
+                          <div key={idx} className="text-[12px] bg-white p-3 rounded-xl border border-gray-100">
+                            <span className="font-bold text-[#3171af]">{e.judge}:</span> <span className="text-gray-700">"{e.comment}"</span>
+                          </div>
+                        ))
+                      }
+                      {allEntriesRaw.filter(e => e.number === modalMedia.number && e.comment.trim().length > 0).length === 0 && (
+                        <div className="text-gray-400 text-[12px] italic">Нет комментариев</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Галерея фото */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {modalMedia.photos.map((url, i) => (
+                      <div key={i} className="group relative aspect-[4/5] bg-gray-100 rounded-[28px] overflow-hidden border border-gray-50 cursor-pointer" onClick={() => setFullscreenImage({ url, index: i })}>
+                        <img src={url} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <i data-lucide="maximize-2" width="32" height="32" className="text-white"></i>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {fullscreenImage && (
+            <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-6" onClick={() => setFullscreenImage(null)}>
+              <button className="absolute top-8 right-8 text-white p-2" onClick={() => setFullscreenImage(null)}>
+                <i data-lucide="x" width="32" height="32"></i>
+              </button>
+              <img src={fullscreenImage.url} className="max-w-full max-h-full object-contain shadow-2xl" alt="View" />
+              <div className="absolute bottom-10 px-8 py-3 bg-white/10 backdrop-blur-xl rounded-full text-white/80 text-[10px] font-black tracking-widest uppercase">
+                Фото {fullscreenImage.index + 1} / {modalMedia?.photos.length}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/apb-admin/a-sw.js')
+          .then(reg => console.log('SW registered:', reg))
+          .catch(err => console.log('SW registration failed:', err));
+      });
+    }
+  </script>
+</body>
+</html>
