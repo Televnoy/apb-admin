@@ -215,7 +215,7 @@
                   comments: [],
                   photos: [],
                   judges: [],
-                  firestoreIds: [] // для возможного использования
+                  firestoreIds: []
                 };
               }
               groups[key].scores.push(Number(p.score) || 0);
@@ -274,21 +274,18 @@
 
       // --- Функция для YandexGPT (анализ комментариев) ---
       const analyzeComments = async (target, mode) => {
-        // mode: 'single' - анализ только одной записи (из потока), 'group' - анализ всех комментариев выступления (из итогов)
         setIsAnalyzing(true);
         setAiAnalysis("");
         setErrorInfo(null);
 
         let commentsText = '';
         if (mode === 'single') {
-          // Анализируем только эту запись
           const { firestoreId, participantIdx } = target;
           const record = allEntriesRaw.find(e => e.firestoreId === firestoreId && e.participantIdx === participantIdx);
           if (record && record.comment.trim()) {
             commentsText = `Судья ${record.judge}: "${record.comment}"`;
           }
         } else {
-          // Анализируем все комментарии выступления (группа)
           const { number, discipline, city, date } = target;
           const targetDate = new Date(date).toDateString();
           const comments = allEntriesRaw
@@ -681,11 +678,13 @@
                     )}
                   </div>
 
-                  {/* Комментарии судей */}
+                  {/* Комментарии судей — динамический заголовок */}
                   <div className="bg-gray-50 rounded-3xl p-6 border border-gray-200">
                     <div className="flex items-center gap-2 mb-4">
                       <i data-lucide="message-square" width="16" height="16" className="text-gray-500"></i>
-                      <span className="text-[10px] text-gray-500 tracking-[0.15em] uppercase">Комментарии судей</span>
+                      <span className="text-[10px] text-gray-500 tracking-[0.15em] uppercase">
+                        {modalMedia.type === 'single' ? 'Комментарий судьи' : 'Комментарии судей'}
+                      </span>
                     </div>
                     <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                       {modalMedia.type === 'single' ? (
@@ -707,8 +706,8 @@
                     </div>
                   </div>
 
-                  {/* Галерея фото */}
-                  {modalMedia.photos && modalMedia.photos.length > 0 && (
+                  {/* Галерея фото — только для режима single */}
+                  {modalMedia.type === 'single' && modalMedia.photos && modalMedia.photos.length > 0 && (
                     <div className="grid grid-cols-2 gap-4">
                       {modalMedia.photos.map((url, i) => (
                         <div key={i} className="group relative aspect-[4/5] bg-gray-100 rounded-[28px] overflow-hidden border border-gray-200 cursor-pointer" onClick={() => setFullscreenImage({ url, index: i })}>
