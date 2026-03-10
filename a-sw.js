@@ -1,9 +1,9 @@
 const CACHE_NAME = 'apb-admin-v2'; // увеличиваем версию
 const urlsToCache = [
-  '/apb-app/admin.html',
-  '/apb-app/a-manifest.json',
-  '/apb-app/aicon-192.png',
-  '/apb-app/aicon-512.png'
+  '/apb-admin/index.html',
+  '/apb-admin/a-manifest.json',
+  '/apb-admin/aicon-192.png',
+  '/apb-admin/aicon-512.png'
 ];
 
 self.addEventListener('install', event => {
@@ -43,7 +43,7 @@ self.addEventListener('fetch', event => {
             return networkResponse;
           });
       })
-      .catch(() => caches.match('/apb-app/admin.html'))
+      .catch(() => caches.match('/apb-admin/index.html'))
   );
 });
 
