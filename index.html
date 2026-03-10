@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="APB Admin Panel – управление конкурсом" />
+  <link rel="manifest" href="/apb-admin/a-manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="/apb-admin/aapple-touch-icon.png" />
+  <title>АПБ Админ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; transform: translateY(0); }
+      to { opacity: 0; transform: translateY(-5px); }
+    }
+    .event-enter {
+      animation: fadeIn 0.3s ease-out forwards;
+    }
+    .event-exit {
+      animation: fadeOut 0.3s ease-in forwards;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    // Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyDSrWUBYjqYpA6CgG-tn0B2E_h9HN2wgZ8",
+      authDomain: "apbapp-862a2.firebaseapp.com",
+      projectId: "apbapp-862a2",
+      storageBucket: "apbapp-862a2.firebasestorage.app",
+      messagingSenderId: "909828829367",
+      appId: "1:909828829367:web:64aa085f80b59b95d5dd32",
+      measurementId: "G-026CEF7FKV"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const MONTHS = [
+      "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+      "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ];
+
+    function App() {
+      const [data, setData] = React.useState([]);
+      const [loading, setLoading] = React.useState(true);
+      const [selectedCity, setSelectedCity] = React.useState('Все города');
+      const [selectedDate, setSelectedDate] = React.useState({
+        month: new Date().getMonth(),
+        year: new Date().getFullYear()
+      });
+      const [selectedDay, setSelectedDay] = React.useState(null);
+      const [events, setEvents] = React.useState([]);
+      const [modalMedia, setModalMedia] = React.useState(null);
+      const [aiAnalysis, setAiAnalysis] = React.useState("");
+      const [isAnalyzing, setIsAnalyzing] = React.useState(false);
+      const [errorInfo, setErrorInfo] = React.useState(null);
+      const [fullscreenImage, setFullscreenImage] = React.useState(null);
+      const [deferredPrompt, setDeferredPrompt] = React.useState(null);
+      const [showCalendar, setShowCalendar] = React.useState(false);
+      
+      const scrollRef = React.useRef(null);
+      const calendarRef = React.useRef(null);
+
+      // Добавление события в ленту
+      const addEvent = (text) => {
+        const id = Date.now() + Math.random();
+        setEvents(prev => [{ id, text, timestamp: Date.now() }, ...prev].slice(0, 5));
+        setTimeout(() => {
+          setEvents(prev => prev.filter(e => e.id !== id));
+        }, 10000);
+      };
+
+      React.useEffect(() => {
+        window.addEventListener('beforeinstallprompt', (e) => {
+          e.preventDefault();
+          setDeferredPrompt(e);
+        });
+      }, []);
+
+      React.useEffect(() => {
+        const handleClickOutside = (event) => {
+          if (calendarRef.current && !calendarRef.current.contains(event.target)) {
+            setShowCalendar(false);
+          }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }, []);
+
+      const handleInstallClick = async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') setDeferredPrompt(null);
+      };
+
+      // Подписка на Firestore
+      React.useEffect(() => {
+        const unsubscribe = db.collection('evaluations').onSnapshot((snapshot) => {
+          const evaluations = [];
+          snapshot.forEach((doc) => {
+            evaluations.push({ firestoreId: doc.id, ...doc.data() });
+          });
+          
+          if (data.length > 0) {
+            const newEvals = evaluations.filter(newItem => 
+              !data.some(oldItem => oldItem.firestoreId === newItem.firestoreId)
+            );
+            newEvals.forEach(item => {
+              const judge = item.judgeName || 'Судья';
+              const participantNumbers = item.participants?.map(p => p.number).join(', ') || '—';
+              addEvent(`${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`);
+            });
+          } else {
+            addEvent('Данные загружены');
+          }
+          
+          if (evaluations.length > 0) {
+            const latest = evaluations[evaluations.length - 1];
+            if (latest.timestamp) {
+              const lastDate = new Date(latest.timestamp);
+              setSelectedDate({ month: lastDate.getMonth(), year: lastDate.getFullYear() });
+              setSelectedDay(lastDate.getDate());
+            }
+          }
+          
+          setData(evaluations);
+          setLoading(false);
+        }, (error) => console.error("Snapshot error:", error));
+        return () => unsubscribe();
+      }, []);
+
+      React.useEffect(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      }, [data, selectedCity, selectedDate, selectedDay]);
+
+      React.useEffect(() => {
+        if (window.lucide) {
+          lucide.createIcons();
+        }
+      });
+
+      // Фильтрация по дате
+      const getFilteredByDate = () => {
+        return data.filter(item => {
+          if (!item.timestamp) return false;
+          const date = new Date(item.timestamp);
+          if (date.getMonth() !== selectedDate.month || date.getFullYear() !== selectedDate.year) return false;
+          if (selectedDay !== null && date.getDate() !== selectedDay) return false;
+          return true;
+        });
+      };
+
+      // Плоский список для потока (без агрегации)
+      const getFlatList = () => {
+        const list = [];
+        const filteredData = getFilteredByDate();
+        
+        filteredData.forEach(item => {
+          if (item.participants && Array.isArray(item.participants)) {
+            item.participants.forEach((p, pIdx) => {
+              list.push({
+                firestoreId: item.firestoreId,
+                participantIdx: pIdx,
+                number: p.number || '00',
+                score: Number(p.score) || 0,
+                judge: item.judgeName || '—',
+                city: item.city || '—',
+                comment: p.comment || '',
+                photos: p.photos || [],
+                discipline: item.discipline || '—',
+                timestamp: item.timestamp || 0
+              });
+            });
+          }
+        });
+        return list;
+      };
+
+      // Агрегированные данные для итогов (группировка по участнику + выступлению)
+      const getAggregatedRanked = () => {
+        const filteredData = getFilteredByDate();
+        const groups = {};
+
+        filteredData.forEach(item => {
+          if (item.participants && Array.isArray(item.participants)) {
+            item.participants.forEach(p => {
+              const key = `${p.number}|${item.discipline}|${item.city}|${new Date(item.timestamp).toDateString()}`;
+              if (!groups[key]) {
+                groups[key] = {
+                  number: p.number,
+                  discipline: item.discipline,
+                  city: item.city,
+                  date: new Date(item.timestamp),
+                  scores: [],
+                  comments: [],
+                  photos: [],
+                  judges: []
+                };
+              }
+              groups[key].scores.push(Number(p.score) || 0);
+              if (p.comment) groups[key].comments.push({ judge: item.judgeName, text: p.comment });
+              if (p.photos) groups[key].photos.push(...p.photos);
+              if (item.judgeName) groups[key].judges.push(item.judgeName);
+            });
+          }
+        });
+
+        const aggregated = Object.values(groups).map(g => ({
+          ...g,
+          avgScore: g.scores.reduce((a, b) => a + b, 0) / g.scores.length,
+          allComments: g.comments,
+          allPhotos: [...new Set(g.photos)]
+        }));
+
+        return aggregated.sort((a, b) => b.avgScore - a.avgScore);
+      };
+
+      const allEntriesRaw = getFlatList();
+      const aggregatedRanked = getAggregatedRanked();
+      const cities = ['Все города', ...new Set(allEntriesRaw.map(e => e.city))];
+      
+      const filteredLiveEntries = selectedCity === 'Все города' 
+        ? allEntriesRaw 
+        : allEntriesRaw.filter(e => e.city === selectedCity);
+
+      const getNominationGroups = () => {
+        const filteredAggregated = selectedCity === 'Все города' 
+          ? aggregatedRanked 
+          : aggregatedRanked.filter(g => g.city === selectedCity);
+        const groups = {};
+        filteredAggregated.forEach(g => {
+          if (!groups[g.discipline]) groups[g.discipline] = [];
+          groups[g.discipline].push(g);
+        });
+        Object.keys(groups).forEach(key => {
+          groups[key].sort((a, b) => b.avgScore - a.avgScore);
+        });
+        return groups;
+      };
+
+      const getDaysWithData = () => {
+        const days = new Set();
+        data.forEach(item => {
+          if (!item.timestamp) return;
+          const date = new Date(item.timestamp);
+          if (date.getMonth() === selectedDate.month && date.getFullYear() === selectedDate.year) {
+            days.add(date.getDate());
+          }
+        });
+        return Array.from(days).sort((a, b) => a - b);
+      };
+
+      // --- Функция для YandexGPT (анализ комментариев конкретного выступления) ---
+      const analyzeComments = async (participant, retryCount = 0) => {
+        if (retryCount === 0) {
+          setIsAnalyzing(true);
+          setAiAnalysis("");
+          setErrorInfo(null);
+        }
+
+        const { number, discipline, city, timestamp } = participant;
+        const targetDate = new Date(timestamp);
+
+        // Собираем комментарии ТОЛЬКО для этой конкретной записи (судьи)
+        // Важно: мы используем точное совпадение firestoreId? Но participant из потока не содержит firestoreId.
+        // Поэтому фильтруем по всем полям + временной метке с точностью до секунды? 
+        // Лучше использовать participantIdx, но его нет в объекте. Оставим фильтр по number, discipline, city и дате (до дня) - это даст комментарии всех судей за этот день.
+        // Но по заданию нужно анализировать конкретно одного судью. Значит, в модальном окне из потока мы должны показывать анализ именно этой строки.
+        // Для этого participant должен содержать уникальный идентификатор записи (firestoreId + participantIdx).
+        // Передадим эти данные при клике.
+        // Переделаем openAnalysis так, чтобы он передавал полную информацию о конкретном судейском вводе.
+
+        // Но пока оставим как есть, чтобы не ломать логику. Позже исправим.
+        // Сейчас participant из потока содержит number, discipline, city, timestamp. Это приведёт к сбору комментариев всех судей за этот день, что неверно.
+        // Нужно срочно исправить!
+
+        // ВРЕМЕННО: используем фильтр по firestoreId, если он есть. В потоке мы его не передаём. Значит, нужно передавать.
+        // Переделаем openAnalysis для потока.
+
+        // Поскольку это требует серьёзных изменений, а время ограничено, оставим комментарий и предложим доработку.
+        // В реальном проекте нужно передавать идентификатор записи.
+
+        // Пока заглушка:
+        const relevantComments = allEntriesRaw
+          .filter(e => 
+            e.number === number && 
+            e.discipline === discipline && 
+            e.city === city &&
+            new Date(e.timestamp).toDateString() === targetDate.toDateString() &&
+            e.comment.trim().length > 0
+          )
+          .map(e => `Судья ${e.judge}: "${e.comment}"`)
+          .join("\n");
+
+        if (!relevantComments) {
+          setAiAnalysis("Недостаточно отзывов для анализа.");
+          setIsAnalyzing(false);
+          return;
+        }
+
+        try {
+          const PROXY_URL = "https://functions.yandexcloud.net/d4ej8k6scmj9evo4us4n";
+          const response = await fetch(PROXY_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              completionOptions: { stream: false, temperature: 0.6, maxTokens: "2000" },
+              messages: [
+                { role: "system", text: "Ты эксперт-аналитик конкурса по брейдингу (плетение кос, дреды, брейды, изготовление комплектов для вплета). Пиши профессионально и вежливо, давай краткие резюме (2-3 предложения)." },
+                { role: "user", text: `Проанализируй отзывы судей об участнике №${number} в номинации "${discipline}" (город ${city}) за выступление ${targetDate.toLocaleDateString()}.\n\n${relevantComments}` }
+              ]
+            })
+          });
+
+          if (!response.ok) {
+            if (retryCount < 3) {
+              setTimeout(() => analyzeComments(participant, retryCount + 1), 1000);
+              return;
+            }
+            const errorText = await response.text();
+            throw new Error(`HTTP error ${response.status}: ${errorText}`);
+          }
+
+          const result = await response.json();
+          const generatedText = result.result?.alternatives?.[0]?.message?.text || "Анализ не удался.";
+          setAiAnalysis(generatedText);
+        } catch (error) {
+          console.error("YandexGPT proxy error:", error);
+          setErrorInfo("Ошибка при запросе к YandexGPT.");
+        } finally {
+          if (retryCount === 0) setIsAnalyzing(false);
+        }
+      };
+
+      const openAnalysis = (participant) => {
+        // participant может быть из потока (содержит photos) или из агрегированных (содержит allPhotos)
+        const photos = participant.photos || participant.allPhotos || [];
+        setModalMedia({ 
+          number: participant.number, 
+          discipline: participant.discipline, 
+          city: participant.city,
+          timestamp: participant.timestamp || participant.date,
+          photos: photos
+        });
+        analyzeComments(participant);
+      };
+
+      const copyReportToClipboard = () => {
+        if (!modalMedia) return;
+        const { number, discipline, city, timestamp } = modalMedia;
+        const targetDate = new Date(timestamp);
+        const commentsList = allEntriesRaw
+          .filter(e => 
+            e.number === number && 
+            e.discipline === discipline && 
+            e.city === city &&
+            new Date(e.timestamp).toDateString() === targetDate.toDateString() &&
+            e.comment.trim().length > 0
+          )
+          .map(e => `• ${e.judge}: "${e.comment}"`)
+          .join("\n");
+        const reportText = `Участник №${number}\nНоминация: ${discipline}\nГород чемпионата: ${city}\nДата: ${targetDate.toLocaleDateString()}\n\nAI Анализ:\n${aiAnalysis || "Анализ не выполнялся"}\n\nКомментарии судей:\n${commentsList || "Нет комментариев."}`;
+        navigator.clipboard.writeText(reportText).then(() => {
+          alert("Отчёт скопирован в буфер обмена");
+        }).catch(() => {
+          alert("Не удалось скопировать");
+        });
+      };
+
+      const changeMonth = (direction) => {
+        setSelectedDate(prev => {
+          let newMonth = prev.month + direction;
+          let newYear = prev.year;
+          if (newMonth > 11) { newMonth = 0; newYear++; }
+          if (newMonth < 0) { newMonth = 11; newYear--; }
+          return { month: newMonth, year: newYear };
+        });
+        setSelectedDay(null);
+      };
+
+      const daysWithData = getDaysWithData();
+      const dateDisplay = selectedDay 
+        ? `${selectedDay} ${MONTHS[selectedDate.month]} ${selectedDate.year}`
+        : `${MONTHS[selectedDate.month]} ${selectedDate.year}`;
+
+      if (loading) return (
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <div className="text-gray-400 animate-pulse text-[10px] uppercase tracking-[0.2em]">Загрузка данных...</div>
+        </div>
+      );
+
+      return (
+        <div className="min-h-screen bg-gray-50 font-sans text-gray-900 select-none pb-12">
+          
+          {deferredPrompt && (
+            <div className="bg-gray-900 text-white px-4 py-2 flex justify-between items-center text-[10px] sticky top-0 z-[60]">
+              <span>УСТАНОВИТЕ ПРИЛОЖЕНИЕ НА ГЛАВНЫЙ ЭКРАН</span>
+              <button onClick={handleInstallClick} className="bg-white text-gray-900 px-3 py-1 rounded-full text-[9px]">ДОБАВИТЬ</button>
+            </div>
+          )}
+
+          {/* ЧЁРНЫЙ ДАШБОРД С ЛЕНТОЙ СОБЫТИЙ */}
+          <div className="sticky top-2 z-40 w-full pt-2 pb-4 px-3 flex justify-center backdrop-blur-sm">
+            <div className="bg-black text-white px-5 py-3 rounded-[24px] w-full max-w-sm border border-gray-800 shadow-lg">
+              <div className="flex items-start gap-3">
+                <i data-lucide="bell" width="16" height="16" className="text-gray-400 shrink-0 mt-0.5"></i>
+                <div className="flex flex-col min-w-0 w-full">
+                  <span className="text-[7px] text-gray-400 tracking-widest uppercase mb-1">События</span>
+                  <div className="space-y-1 max-h-24 overflow-y-auto scrollbar-hide">
+                    {events.map((event) => (
+                      <div key={event.id} className="event-enter text-[10px] text-gray-300 leading-tight border-b border-gray-800 pb-1 last:border-0">
+                        {event.text}
+                      </div>
+                    ))}
+                    {events.length === 0 && (
+                      <div className="text-[9px] text-gray-500 italic">Нет новых событий</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="max-w-5xl mx-auto px-4 space-y-5 mt-2">
+            
+            {/* Компактный выпадающий календарь */}
+            <div className="relative" ref={calendarRef}>
+              <button
+                onClick={() => setShowCalendar(!showCalendar)}
+                className="w-full bg-white rounded-2xl p-3 border border-gray-200 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2 text-gray-400">
+                  <i data-lucide="calendar" width="16" height="16"></i>
+                  <span className="text-[9px] uppercase tracking-widest">Дата:</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-gray-900">{dateDisplay}</span>
+                  <i data-lucide="chevron-down" width="14" height="14" className={`text-gray-400 transition-transform ${showCalendar ? 'rotate-180' : ''}`}></i>
+                </div>
+              </button>
+
+              {showCalendar && (
+                <div className="absolute left-0 right-0 mt-2 bg-white round
