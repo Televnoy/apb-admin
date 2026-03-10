@@ -60,7 +60,7 @@
       });
       const [selectedDay, setSelectedDay] = React.useState(null);
       const [lastEvent, setLastEvent] = React.useState('Ожидание обновлений...');
-      const [overviewText, setOverviewText] = React.useState('Анализируем данные...'); // Новая строка для анализа
+      const [overviewText, setOverviewText] = React.useState('Анализируем данные...');
       const [modalMedia, setModalMedia] = React.useState(null);
       const [aiAnalysis, setAiAnalysis] = React.useState("");
       const [isAnalyzing, setIsAnalyzing] = React.useState(false);
@@ -71,7 +71,7 @@
       
       const scrollRef = React.useRef(null);
       const calendarRef = React.useRef(null);
-      const overviewTimeout = React.useRef(null); // Для debounce запросов анализа
+      const overviewTimeout = React.useRef(null);
 
       React.useEffect(() => {
         window.addEventListener('beforeinstallprompt', (e) => {
@@ -111,7 +111,7 @@
             if (latest.timestamp) {
               const lastDate = new Date(latest.timestamp);
               setSelectedDate({ month: lastDate.getMonth(), year: lastDate.getFullYear() });
-              setSelectedDay(lastDate.getDate());
+              setSelectedDay(lastDate.getDate()); // ← устанавливаем день последней записи
             }
           }
           
@@ -133,7 +133,6 @@
         }
       });
 
-      // Получение отфильтрованных по дате данных
       const getFilteredByDate = () => {
         return data.filter(item => {
           if (!item.timestamp) return false;
@@ -144,7 +143,6 @@
         });
       };
 
-      // Плоский список всех записей с участниками
       const getFlatList = (sortByScore = false) => {
         const list = [];
         const filteredData = getFilteredByDate();
@@ -210,7 +208,6 @@
           return;
         }
 
-        // Собираем статистику
         const totalEntries = allEntriesRaw.length;
         const uniqueParticipants = [...new Set(allEntriesRaw.map(e => e.number))].length;
         const citiesCount = [...new Set(allEntriesRaw.map(e => e.city))].length;
@@ -234,10 +231,7 @@
             })
           });
 
-          if (!response.ok) {
-            throw new Error(`HTTP error ${response.status}`);
-          }
-
+          if (!response.ok) throw new Error(`HTTP error ${response.status}`);
           const result = await response.json();
           const text = result.result?.alternatives?.[0]?.message?.text || "Анализ временно недоступен";
           setOverviewText(text);
@@ -247,12 +241,11 @@
         }
       }, [allEntriesRaw, allEntriesRanked]);
 
-      // Debounce вызов fetchOverview при изменении данных
       React.useEffect(() => {
         if (overviewTimeout.current) clearTimeout(overviewTimeout.current);
         overviewTimeout.current = setTimeout(() => {
           fetchOverview();
-        }, 1000); // ждём 1 секунду после последнего изменения
+        }, 1000);
         return () => clearTimeout(overviewTimeout.current);
       }, [allEntriesRaw, fetchOverview]);
 
@@ -286,7 +279,6 @@
 
         try {
           const PROXY_URL = "https://functions.yandexcloud.net/d4ej8k6scmj9evo4us4n";
-
           const response = await fetch(PROXY_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -315,9 +307,7 @@
           console.error("YandexGPT proxy error:", error);
           setErrorInfo("Ошибка при запросе к YandexGPT.");
         } finally {
-          if (retryCount === 0) {
-            setIsAnalyzing(false);
-          }
+          if (retryCount === 0) setIsAnalyzing(false);
         }
       };
 
@@ -362,11 +352,10 @@
           if (newMonth < 0) { newMonth = 11; newYear--; }
           return { month: newMonth, year: newYear };
         });
-        setSelectedDay(null);
+        setSelectedDay(null); // при смене месяца показываем все дни
       };
 
       const daysWithData = getDaysWithData();
-
       const dateDisplay = selectedDay 
         ? `${selectedDay} ${MONTHS[selectedDate.month]} ${selectedDate.year}`
         : `${MONTHS[selectedDate.month]} ${selectedDate.year}`;
@@ -387,7 +376,7 @@
             </div>
           )}
 
-          {/* ЧЁРНЫЙ ДАШБОРД С ДВУМЯ СТРОКАМИ (последнее событие + ИИ-анализ) */}
+          {/* ЧЁРНЫЙ ДАШБОРД — последнее событие + аналитика ИИ (теперь двухстрочная, шрифт 10px) */}
           <div className="sticky top-2 z-40 w-full pt-2 pb-4 px-3 flex justify-center backdrop-blur-sm">
             <div className="bg-black text-white px-5 py-3 rounded-[24px] w-full max-w-sm border border-gray-800 shadow-lg">
               <div className="flex items-start gap-3">
@@ -395,7 +384,7 @@
                 <div className="flex flex-col min-w-0 w-full">
                   <span className="text-[7px] text-gray-400 tracking-widest uppercase mb-0.5">Live Status</span>
                   <span key={lastEvent} className="text-[11px] leading-tight truncate fade-in">{lastEvent}</span>
-                  <span key={overviewText} className="text-[8px] text-gray-300 mt-1 truncate fade-in">{overviewText}</span>
+                  <span key={overviewText} className="text-[10px] text-gray-300 mt-1 leading-snug fade-in line-clamp-2">{overviewText}</span>
                 </div>
               </div>
             </div>
