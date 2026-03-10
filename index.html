@@ -51,7 +51,7 @@
         month: new Date().getMonth(),
         year: new Date().getFullYear()
       });
-      const [selectedDay, setSelectedDay] = React.useState(null); // день месяца или null (все дни)
+      const [selectedDay, setSelectedDay] = React.useState(null);
       const [lastEvent, setLastEvent] = React.useState('Ожидание обновлений...');
       const [modalMedia, setModalMedia] = React.useState(null);
       const [aiAnalysis, setAiAnalysis] = React.useState("");
@@ -76,7 +76,6 @@
         if (outcome === 'accepted') setDeferredPrompt(null);
       };
 
-      // Подписка на Firestore
       React.useEffect(() => {
         const unsubscribe = db.collection('evaluations').onSnapshot((snapshot) => {
           const evaluations = [];
@@ -87,7 +86,6 @@
           if (evaluations.length > 0) {
             const latest = evaluations[evaluations.length - 1];
             setLastEvent(`Судья ${latest.judgeName || '—'} оценил участника в номинации ${latest.discipline || '—'}`);
-            // Устанавливаем дату последней записи
             if (latest.timestamp) {
               const lastDate = new Date(latest.timestamp);
               setSelectedDate({ month: lastDate.getMonth(), year: lastDate.getFullYear() });
@@ -113,7 +111,6 @@
         }
       });
 
-      // Фильтр по месяцу, году и дню
       const getFilteredByDate = () => {
         return data.filter(item => {
           if (!item.timestamp) return false;
@@ -170,7 +167,6 @@
         return groups;
       };
 
-      // Получить дни, в которые есть записи в текущем месяце
       const getDaysWithData = () => {
         const days = new Set();
         data.forEach(item => {
@@ -183,7 +179,6 @@
         return Array.from(days).sort((a, b) => a - b);
       };
 
-      // --- ФУНКЦИЯ ДЛЯ YANDEXGPT ЧЕРЕЗ ПРОКСИ (с учётом всех параметров выступления) ---
       const analyzeComments = async (participant, retryCount = 0) => {
         if (retryCount === 0) {
           setIsAnalyzing(true);
@@ -260,7 +255,6 @@
         }
       };
 
-      // Функция для открытия анализа из блока итогов
       const openAnalysis = (participant) => {
         setModalMedia({ 
           photos: participant.photos, 
@@ -272,7 +266,6 @@
         analyzeComments(participant);
       };
 
-      // Функция копирования отчёта в буфер обмена (с учётом конкретного выступления)
       const copyReportToClipboard = () => {
         if (!modalMedia) return;
         const { number, discipline, city, timestamp } = modalMedia;
@@ -303,7 +296,7 @@
           if (newMonth < 0) { newMonth = 11; newYear--; }
           return { month: newMonth, year: newYear };
         });
-        setSelectedDay(null); // при смене месяца сбрасываем выбранный день
+        setSelectedDay(null);
       };
 
       const daysWithData = getDaysWithData();
@@ -336,42 +329,42 @@
 
           <div className="max-w-5xl mx-auto px-4 space-y-5 mt-2">
             
-            {/* Блок выбора месяца и дня */}
-            <div className="bg-white rounded-3xl p-4 border border-gray-100 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3 text-gray-400">
-                  <i data-lucide="calendar" width="18" height="18"></i>
-                  <span className="text-[10px] font-black uppercase tracking-widest">Архив событий</span>
+            {/* КОМПАКТНЫЙ БЛОК ВЫБОРА ДАТЫ */}
+            <div className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-gray-400">
+                  <i data-lucide="calendar" width="16" height="16"></i>
+                  <span className="text-[9px] font-black uppercase tracking-widest">Архив</span>
                 </div>
-                <div className="flex items-center gap-5 bg-gray-50 rounded-2xl px-3 py-1.5 border border-gray-100">
-                  <button onClick={() => changeMonth(-1)} className="p-1.5 hover:bg-white hover:shadow-sm rounded-xl transition-all text-gray-600">
-                    <i data-lucide="chevron-left" width="20" height="20"></i>
+                <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-2 py-1 border border-gray-100">
+                  <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-white hover:shadow-sm rounded-lg transition-all text-gray-600">
+                    <i data-lucide="chevron-left" width="16" height="16"></i>
                   </button>
-                  <div className="flex flex-col items-center min-w-[110px]">
-                    <span className="text-[12px] font-black uppercase tracking-tight">{MONTHS[selectedDate.month]}</span>
-                    <span className="text-[8px] font-black text-[#3171af] tracking-widest">{selectedDate.year}</span>
+                  <div className="flex flex-col items-center min-w-[80px]">
+                    <span className="text-[10px] font-black uppercase tracking-tight leading-tight">{MONTHS[selectedDate.month]}</span>
+                    <span className="text-[7px] font-black text-[#3171af] tracking-widest -mt-0.5">{selectedDate.year}</span>
                   </div>
-                  <button onClick={() => changeMonth(1)} className="p-1.5 hover:bg-white hover:shadow-sm rounded-xl transition-all text-gray-600">
-                    <i data-lucide="chevron-right" width="20" height="20"></i>
+                  <button onClick={() => changeMonth(1)} className="p-1 hover:bg-white hover:shadow-sm rounded-lg transition-all text-gray-600">
+                    <i data-lucide="chevron-right" width="16" height="16"></i>
                   </button>
                 </div>
               </div>
 
-              {/* Горизонтальный список дней */}
+              {/* Дни с данными — компактный список */}
               {daysWithData.length > 0 && (
-                <div className="flex justify-center overflow-hidden">
-                  <div className="bg-gray-50 rounded-full p-1.5 flex gap-1 overflow-x-auto max-w-full scrollbar-hide">
+                <div className="flex justify-start mt-2 overflow-hidden">
+                  <div className="bg-gray-50 rounded-full p-1 flex gap-0.5 overflow-x-auto max-w-full scrollbar-hide">
                     <button
                       onClick={() => setSelectedDay(null)}
-                      className={`px-4 py-2 rounded-full text-[10px] font-black transition-all whitespace-nowrap uppercase tracking-tighter ${selectedDay === null ? 'bg-black text-white' : 'text-gray-400 hover:bg-gray-200'}`}
+                      className={`px-3 py-1 rounded-full text-[8px] font-black transition-all whitespace-nowrap uppercase tracking-tighter ${selectedDay === null ? 'bg-black text-white' : 'text-gray-400 hover:bg-gray-200'}`}
                     >
-                      Все дни
+                      Все
                     </button>
                     {daysWithData.map(day => (
                       <button
                         key={day}
                         onClick={() => setSelectedDay(day)}
-                        className={`px-4 py-2 rounded-full text-[10px] font-black transition-all whitespace-nowrap uppercase tracking-tighter ${selectedDay === day ? 'bg-black text-white' : 'text-gray-400 hover:bg-gray-200'}`}
+                        className={`px-3 py-1 rounded-full text-[8px] font-black transition-all whitespace-nowrap uppercase tracking-tighter ${selectedDay === day ? 'bg-black text-white' : 'text-gray-400 hover:bg-gray-200'}`}
                       >
                         {day}
                       </button>
@@ -515,7 +508,7 @@
             </div>
           </div>
 
-          {/* Модальное окно с медиа и AI анализом */}
+          {/* Модальное окно */}
           {modalMedia && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md" onClick={() => { setModalMedia(null); setAiAnalysis(""); }}>
               <div className="bg-white w-full max-w-xl rounded-[40px] overflow-hidden flex flex-col max-h-[90vh] shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -552,7 +545,7 @@
                     )}
                   </div>
 
-                  {/* Комментарии судей (только для этого выступления) */}
+                  {/* Комментарии судей */}
                   <div className="bg-gray-50 rounded-3xl p-6 border border-gray-100">
                     <div className="flex items-center gap-2 mb-4">
                       <i data-lucide="message-square" width="16" height="16" className="text-[#3171af]"></i>
@@ -585,7 +578,7 @@
                     </div>
                   </div>
 
-                  {/* Галерея фото */}
+                  {/* Галерея */}
                   <div className="grid grid-cols-2 gap-4">
                     {modalMedia.photos.map((url, i) => (
                       <div key={i} className="group relative aspect-[4/5] bg-gray-100 rounded-[28px] overflow-hidden border border-gray-50 cursor-pointer" onClick={() => setFullscreenImage({ url, index: i })}>
