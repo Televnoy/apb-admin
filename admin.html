@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#000000" />
   <meta name="description" content="APB Admin Panel – управление конкурсом" />
-  <link rel="manifest" href="/apb-app/a-manifest.json" />
+  <link rel="manifest" href="/apb-admin/a-manifest.json" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <!-- Иконка для iOS с префиксом "a" -->
-  <link rel="apple-touch-icon" href="/apb-app/aapple-touch-icon.png" />
-  <title>APB Admin</title>
+  <link rel="apple-touch-icon" href="/apb-admin/aapple-touch-icon.png" />
+  <title>АПБ Админ</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
@@ -435,7 +435,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/apb-app/a-sw.js')
+        navigator.serviceWorker.register('/apb-admin/a-sw.js')
           .then(reg => console.log('SW registered:', reg))
           .catch(err => console.log('SW registration failed:', err));
       });
