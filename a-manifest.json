@@ -1,7 +1,7 @@
 {
-  "name": "АПБ Админ панель",
+  "name": "АПБ Админ Панель",
   "short_name": "АПБ Админ",
-  "description": "Панель управления АПБ",
+  "description": "Панель управления чемпионатом АПБ",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
