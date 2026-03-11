@@ -1,11 +1,10 @@
-const CACHE_NAME = 'apb-admin-v2'; // увеличиваем версию
+const CACHE_NAME = 'apb-admin-v2';
 const urlsToCache = [
   '/apb-admin/index.html',
   '/apb-admin/a-manifest.json',
   '/apb-admin/aicon-192.png',
   '/apb-admin/aicon-512.png'
 ];
-
 
 self.addEventListener('install', event => {
   event.waitUntil(
