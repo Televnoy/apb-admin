@@ -6,6 +6,7 @@ const urlsToCache = [
   '/apb-admin/aicon-512.png'
 ];
 
+
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
