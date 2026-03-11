@@ -1,11 +1,7 @@
 {
-  "name": "АПБ Админ панель",
   "short_name": "АПБ Админ",
-  "description": "Панель управления АПБ",
-  "start_url": "/apb-admin/index.html",
-  "display": "standalone",
-  "background_color": "#F2F2F2",
-  "theme_color": "#000000",
+  "name": "АПБ Админ панель",
+
   "icons": [
     {
       "src": "/apb-admin/aicon-192.png",
@@ -17,5 +13,14 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ]
+  ],
+
+  "start_url": "/apb-admin/index.html",
+  "description": "Панель управления АПБ",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "scope": "/app-admin/",
+  "theme_color": "#ffffff",
+  
 }
+
