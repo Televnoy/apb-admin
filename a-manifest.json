@@ -2,7 +2,7 @@
   "name": "APB Admin Panel",
   "short_name": "APB Admin",
   "description": "Панель управления АПБ",
-  "start_url": "/apb-admin/index.html",
+  "start_url": "/apb-admin/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#000000",
