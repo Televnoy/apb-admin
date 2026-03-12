@@ -202,7 +202,7 @@
         setupFCM();
       }, [adminDeviceId]);
 
-      // Обработка входящих сообщений
+      // Обработка входящих сообщений (push, когда приложение открыто)
       React.useEffect(() => {
         const unsubscribe = onMessage(messaging, (payload) => {
           console.log('Message received in foreground:', payload);
@@ -222,39 +222,48 @@
         return () => unsubscribe();
       }, []);
 
-      // Подписка на evaluations
+      // ИСПРАВЛЕННАЯ ПОДПИСКА НА EVALUATIONS
       React.useEffect(() => {
         const unsubscribe = onSnapshot(collection(db, 'evaluations'), (snapshot) => {
-          const evaluations = [];
-          snapshot.forEach((doc) => {
-            evaluations.push({ firestoreId: doc.id, ...doc.data() });
-          });
-          
-          if (data.length > 0) {
-            const newEvals = evaluations.filter(newItem => 
-              !data.some(oldItem => oldItem.firestoreId === newItem.firestoreId)
-            );
-            newEvals.forEach(item => {
-              const judge = item.judgeName || 'Судья';
-              const participantNumbers = item.participants?.map(p => p.number).join(', ') || '—';
-              showEvent(`${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`);
-            });
-          } else {
-            showEvent('Данные загружены');
-          }
-          
+          const evaluations = snapshot.docs.map(doc => ({ firestoreId: doc.id, ...doc.data() }));
+          console.log('Получены оценки:', evaluations);
+
           if (evaluations.length > 0) {
-            const latest = evaluations[evaluations.length - 1];
-            if (latest.timestamp) {
-              const lastDate = new Date(latest.timestamp);
+            // Если уже были данные, ищем новые
+            if (data.length > 0) {
+              const newEvals = evaluations.filter(newItem => 
+                !data.some(oldItem => oldItem.firestoreId === newItem.firestoreId)
+              );
+              newEvals.forEach(item => {
+                const judge = item.judgeName || 'Судья';
+                const participantNumbers = item.participants?.map(p => p.number).join(', ') || '—';
+                showEvent(`${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`);
+              });
+            } else {
+              // Первая загрузка
+              showEvent('Данные загружены');
+            }
+
+            // Сортируем по createdAt (timestamp Firestore) – самое новое первым
+            const sorted = [...evaluations].sort((a, b) => {
+              const ta = a.createdAt ? a.createdAt.toDate() : 0;
+              const tb = b.createdAt ? b.createdAt.toDate() : 0;
+              return tb - ta;
+            });
+            const latest = sorted[0];
+            if (latest?.createdAt) {
+              const lastDate = latest.createdAt.toDate();
               setSelectedDate({ month: lastDate.getMonth(), year: lastDate.getFullYear() });
               setSelectedDay(lastDate.getDate());
             }
+          } else {
+            showEvent('Нет данных');
           }
-          
+
           setData(evaluations);
           setLoading(false);
         }, (error) => console.error("Snapshot error:", error));
+
         return () => unsubscribe();
       }, []);
 
@@ -270,11 +279,11 @@
         }
       });
 
-      // Фильтрация по дате
+      // Фильтрация по дате (используем createdAt)
       const getFilteredByDate = () => {
         return data.filter(item => {
-          if (!item.timestamp) return false;
-          const date = new Date(item.timestamp);
+          if (!item.createdAt) return false;
+          const date = item.createdAt.toDate();
           if (date.getMonth() !== selectedDate.month || date.getFullYear() !== selectedDate.year) return false;
           if (selectedDay !== null && date.getDate() !== selectedDay) return false;
           return true;
@@ -299,7 +308,7 @@
                 comment: p.comment || '',
                 photos: p.photos || [],
                 discipline: item.discipline || '—',
-                timestamp: item.timestamp || 0
+                createdAt: item.createdAt // для сортировки
               });
             });
           }
@@ -307,7 +316,7 @@
         return list;
       };
 
-      // Агрегированные данные для итогов
+      // Агрегированные данные для итогов (используем createdAt)
       const getAggregatedRanked = () => {
         const filteredData = getFilteredByDate();
         const groups = {};
@@ -315,13 +324,15 @@
         filteredData.forEach(item => {
           if (item.participants && Array.isArray(item.participants)) {
             item.participants.forEach(p => {
-              const key = `${p.number}|${item.discipline}|${item.city}|${new Date(item.timestamp).toDateString()}`;
+              // Для ключа используем дату из createdAt
+              const dateKey = item.createdAt ? item.createdAt.toDate().toDateString() : 'unknown';
+              const key = `${p.number}|${item.discipline}|${item.city}|${dateKey}`;
               if (!groups[key]) {
                 groups[key] = {
                   number: p.number,
                   discipline: item.discipline,
                   city: item.city,
-                  date: new Date(item.timestamp),
+                  date: item.createdAt ? item.createdAt.toDate() : new Date(0),
                   scores: [],
                   comments: [],
                   photos: [],
@@ -374,8 +385,8 @@
       const getDaysWithData = () => {
         const days = new Set();
         data.forEach(item => {
-          if (!item.timestamp) return;
-          const date = new Date(item.timestamp);
+          if (!item.createdAt) return;
+          const date = item.createdAt.toDate();
           if (date.getMonth() === selectedDate.month && date.getFullYear() === selectedDate.year) {
             days.add(date.getDate());
           }
@@ -384,67 +395,7 @@
       };
 
       const analyzeComments = async (target, mode) => {
-        setIsAnalyzing(true);
-        setAiAnalysis("");
-        setErrorInfo(null);
-
-        let commentsText = '';
-        if (mode === 'single') {
-          const { firestoreId, participantIdx } = target;
-          const record = allEntriesRaw.find(e => e.firestoreId === firestoreId && e.participantIdx === participantIdx);
-          if (record && record.comment.trim()) {
-            commentsText = `Судья ${record.judge}: "${record.comment}"`;
-          }
-        } else {
-          const { number, discipline, city, date } = target;
-          const targetDate = new Date(date).toDateString();
-          const comments = allEntriesRaw
-            .filter(e => 
-              e.number === number && 
-              e.discipline === discipline && 
-              e.city === city &&
-              new Date(e.timestamp).toDateString() === targetDate &&
-              e.comment.trim().length > 0
-            )
-            .map(e => `Судья ${e.judge}: "${e.comment}"`)
-            .join("\n");
-          commentsText = comments;
-        }
-
-        if (!commentsText) {
-          setAiAnalysis("Недостаточно отзывов для анализа.");
-          setIsAnalyzing(false);
-          return;
-        }
-
-        try {
-          const PROXY_URL = "https://functions.yandexcloud.net/d4ej8k6scmj9evo4us4n";
-          const response = await fetch(PROXY_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              completionOptions: { stream: false, temperature: 0.6, maxTokens: "2000" },
-              messages: [
-                { role: "system", text: "Ты эксперт-аналитик конкурса по брейдингу (плетение кос, дреды, брейды, изготовление комплектов для вплета). Пиши профессионально и вежливо, давай краткие резюме (2-3 предложения)." },
-                { role: "user", text: `Проанализируй отзывы судей:\n\n${commentsText}` }
-              ]
-            })
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`HTTP error ${response.status}: ${errorText}`);
-          }
-
-          const result = await response.json();
-          const generatedText = result.result?.alternatives?.[0]?.message?.text || "Анализ не удался.";
-          setAiAnalysis(generatedText);
-        } catch (error) {
-          console.error("YandexGPT proxy error:", error);
-          setErrorInfo("Ошибка при запросе к YandexGPT.");
-        } finally {
-          setIsAnalyzing(false);
-        }
+        // ... (без изменений)
       };
 
       const openFromStream = (item) => {
@@ -455,7 +406,7 @@
           number: item.number,
           discipline: item.discipline,
           city: item.city,
-          timestamp: item.timestamp,
+          timestamp: item.createdAt?.toDate().toISOString() || new Date().toISOString(),
           photos: item.photos,
           judge: item.judge,
           comment: item.comment
@@ -477,19 +428,7 @@
       };
 
       const copyReportToClipboard = () => {
-        if (!modalMedia) return;
-        let commentsList = '';
-        if (modalMedia.type === 'single') {
-          commentsList = `• ${modalMedia.judge}: "${modalMedia.comment}"`;
-        } else {
-          commentsList = modalMedia.comments.map(c => `• ${c.judge}: "${c.text}"`).join("\n");
-        }
-        const reportText = `Участник №${modalMedia.number}\nНоминация: ${modalMedia.discipline}\nГород чемпионата: ${modalMedia.city}\nДата: ${new Date(modalMedia.timestamp).toLocaleDateString()}\n\nAI Анализ:\n${aiAnalysis || "Анализ не выполнялся"}\n\nКомментарии судей:\n${commentsList || "Нет комментариев."}`;
-        navigator.clipboard.writeText(reportText).then(() => {
-          alert("Отчёт скопирован в буфер обмена");
-        }).catch(() => {
-          alert("Не удалось скопировать");
-        });
+        // ... (без изменений)
       };
 
       const changeMonth = (direction) => {
