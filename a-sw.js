@@ -1,4 +1,4 @@
-const CACHE_NAME = 'apb-admin-v2'; // при изменении файлов увеличивайте версию, например v3
+const CACHE_NAME = 'apb-admin-v3'; // при изменении файлов увеличивайте версию, например v3
 const urlsToCache = [
   '/apb-admin/index.html',
   '/apb-admin/a-manifest.json',
