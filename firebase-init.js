@@ -16,10 +16,8 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const messaging = getMessaging(app);
 
-// Ссылка на коллекцию для токенов админок
 const adminFcmTokensRef = collection(db, 'adminFcmTokens');
 
-// Функция для сохранения токена
 const saveFcmToken = async (deviceId, token, userAgent) => {
   await setDoc(doc(adminFcmTokensRef, deviceId), {
     fcmToken: token,
