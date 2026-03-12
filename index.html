@@ -14,11 +14,19 @@
   <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-  <!-- Firebase Messaging для push-уведомлений -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Import map for Firebase modules -->
+  <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
+        "firebase/messaging": "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js"
+      }
+    }
+  </script>
+  <!-- Наш модуль инициализации Firebase -->
+  <script type="module" src="/apb-admin/firebase-init.js"></script>
   <style>
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
@@ -33,19 +41,10 @@
 </head>
 <body>
   <div id="root"></div>
-  <script type="text/babel">
-    // Firebase
-    const firebaseConfig = {
-      apiKey: "AIzaSyDSrWUBYjqYpA6CgG-tn0B2E_h9HN2wgZ8",
-      authDomain: "apbapp-862a2.firebaseapp.com",
-      projectId: "apbapp-862a2",
-      storageBucket: "apbapp-862a2.firebasestorage.app",
-      messagingSenderId: "909828829367",
-      appId: "1:909828829367:web:64aa085f80b59b95d5dd32",
-      measurementId: "G-026CEF7FKV"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+  <script type="text/babel" data-type="module">
+    import { db, messaging, saveFcmToken } from '/apb-admin/firebase-init.js';
+    import { collection, onSnapshot, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+    import { getToken, onMessage } from 'firebase/messaging';
 
     const MONTHS = [
       "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
@@ -71,8 +70,6 @@
       const [deferredPrompt, setDeferredPrompt] = React.useState(null);
       const [showCalendar, setShowCalendar] = React.useState(false);
       const [showUpdateNotification, setShowUpdateNotification] = React.useState(false);
-      
-      // Уникальный ID устройства для админки
       const [adminDeviceId, setAdminDeviceId] = React.useState('');
 
       const scrollRef = React.useRef(null);
@@ -173,54 +170,41 @@
         setAdminDeviceId(deviceId);
       }, []);
 
-     // Получение и сохранение FCM токена (исправленная версия)
-React.useEffect(() => {
-  if (!adminDeviceId) return;
-
-  const setupFCM = async () => {
-    try {
-      // Регистрируем пустой воркер для Firebase (чтобы не было 404)
-      if ('serviceWorker' in navigator) {
-        await navigator.serviceWorker.register('/apb-admin/firebase-messaging-sw.js', {
-          scope: '/apb-admin/'
-        }).catch(err => console.log('Fake SW registration (optional)', err));
-      }
-
-      // Ждём, пока основной сервис-воркер (a-sw.js) активируется
-      await navigator.serviceWorker.ready;
-      
-      const messaging = firebase.messaging();
-      
-      if (Notification.permission !== 'granted') {
-        await Notification.requestPermission();
-      }
-      
-      if (Notification.permission === 'granted') {
-        const vapidKey = 'BHZoy1QJ4PkloCIRFeKQ2UwYr44eziDY8C8wXqL4bSG6mbRGxQ03-v6vGJCmITc3jPWKfcq3Au3gVT860yIwNLg';
-        // Просто получаем токен – теперь Firebase найдёт зарегистрированный воркер
-        const token = await messaging.getToken({ vapidKey });
-        
-        if (token) {
-          await db.collection('adminFcmTokens').doc(adminDeviceId).set({
-            fcmToken: token,
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
-            userAgent: navigator.userAgent
-          }, { merge: true });
-          console.log('Admin FCM token saved');
-        }
-      }
-    } catch (err) {
-      console.error('FCM setup error:', err);
-    }
-  };
-
-  setupFCM();
-}, [adminDeviceId]);
-      
-      // Обработка входящих сообщений (когда приложение открыто)
+      // Получение и сохранение FCM токена
       React.useEffect(() => {
-        const messaging = firebase.messaging();
-        const unsubscribe = messaging.onMessage((payload) => {
+        if (!adminDeviceId) return;
+
+        const setupFCM = async () => {
+          try {
+            const registration = await navigator.serviceWorker.ready;
+
+            if (Notification.permission !== 'granted') {
+              await Notification.requestPermission();
+            }
+            
+            if (Notification.permission === 'granted') {
+              const vapidKey = 'BHZoy1QJ4PkloCIRFeKQ2UwYr44eziDY8C8wXqL4bSG6mbRGxQ03-v6vGJCmITc3jPWKfcq3Au3gVT860yIwNLg';
+              const token = await getToken(messaging, {
+                vapidKey,
+                serviceWorkerRegistration: registration
+              });
+              
+              if (token) {
+                await saveFcmToken(adminDeviceId, token, navigator.userAgent);
+                console.log('Admin FCM token saved');
+              }
+            }
+          } catch (err) {
+            console.error('FCM setup error:', err);
+          }
+        };
+
+        setupFCM();
+      }, [adminDeviceId]);
+
+      // Обработка входящих сообщений
+      React.useEffect(() => {
+        const unsubscribe = onMessage(messaging, (payload) => {
           console.log('Message received in foreground:', payload);
           let text = '';
           if (payload.notification) {
@@ -238,9 +222,9 @@ React.useEffect(() => {
         return () => unsubscribe();
       }, []);
 
-      // Подписка на Firestore
+      // Подписка на evaluations
       React.useEffect(() => {
-        const unsubscribe = db.collection('evaluations').onSnapshot((snapshot) => {
+        const unsubscribe = onSnapshot(collection(db, 'evaluations'), (snapshot) => {
           const evaluations = [];
           snapshot.forEach((doc) => {
             evaluations.push({ firestoreId: doc.id, ...doc.data() });
@@ -286,7 +270,7 @@ React.useEffect(() => {
         }
       });
 
-      // Фильтрация и агрегация (без изменений)
+      // Фильтрация по дате
       const getFilteredByDate = () => {
         return data.filter(item => {
           if (!item.timestamp) return false;
@@ -297,6 +281,7 @@ React.useEffect(() => {
         });
       };
 
+      // Плоский список для потока
       const getFlatList = () => {
         const list = [];
         const filteredData = getFilteredByDate();
@@ -322,6 +307,7 @@ React.useEffect(() => {
         return list;
       };
 
+      // Агрегированные данные для итогов
       const getAggregatedRanked = () => {
         const filteredData = getFilteredByDate();
         const groups = {};
