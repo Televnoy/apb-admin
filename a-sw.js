@@ -16,10 +16,17 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // Пропускаем POST-запросы – не пытаемся их кэшировать
+  if (event.request.method !== 'GET') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then(cachedResponse => {
         if (cachedResponse) {
+          // Фоновое обновление кэша
           event.waitUntil(
             fetch(event.request)
               .then(networkResponse => {
@@ -30,6 +37,7 @@ self.addEventListener('fetch', event => {
           );
           return cachedResponse;
         }
+        // Нет в кэше – идём в сеть и кэшируем ответ
         return fetch(event.request)
           .then(networkResponse => {
             const responseToCache = networkResponse.clone();
