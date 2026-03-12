@@ -1,4 +1,4 @@
-const CACHE_NAME = 'apb-admin-v3'; // при изменении файлов увеличивайте версию, например v3
+const CACHE_NAME = 'apb-admin-v3'; // увеличьте версию
 const urlsToCache = [
   '/apb-admin/index.html',
   '/apb-admin/a-manifest.json',
@@ -11,14 +11,11 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => {
         const cachePromises = urlsToCache.map(url => {
-          return cache.add(url).catch(err => {
-            console.warn(`Failed to cache ${url}:`, err);
-          });
+          return cache.add(url).catch(err => console.warn(`Failed to cache ${url}:`, err));
         });
         return Promise.all(cachePromises);
       })
   );
-  // Заставляем новый воркер активироваться сразу после установки
   self.skipWaiting();
 });
 
@@ -27,19 +24,16 @@ self.addEventListener('fetch', event => {
     caches.match(event.request)
       .then(response => {
         if (response) {
-          // Фоновое обновление
           fetch(event.request)
             .then(networkResponse => {
-              caches.open(CACHE_NAME)
-                .then(cache => cache.put(event.request, networkResponse));
+              caches.open(CACHE_NAME).then(cache => cache.put(event.request, networkResponse));
             })
             .catch(() => {});
           return response;
         }
         return fetch(event.request)
           .then(networkResponse => {
-            caches.open(CACHE_NAME)
-              .then(cache => cache.put(event.request, networkResponse.clone()));
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, networkResponse.clone()));
             return networkResponse;
           });
       })
@@ -50,18 +44,40 @@ self.addEventListener('fetch', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => 
-      Promise.all(
-        keys.filter(key => key !== CACHE_NAME)
-            .map(key => caches.delete(key))
-      )
-    ).then(() => {
-      // Немедленно захватываем контроль над всеми клиентами
-      return self.clients.claim();
-    })
+      Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))
+    ).then(() => self.clients.claim())
   );
 });
 
-// Слушаем сообщения от страницы
+// Обработка push-уведомлений
+self.addEventListener('push', event => {
+  let data = {};
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch {
+      data = { title: 'Новое событие', body: event.data.text() };
+    }
+  }
+  const options = {
+    body: data.body || 'Обновите приложение',
+    icon: '/apb-admin/aicon-192.png',
+    badge: '/apb-admin/aicon-72.png',
+    vibrate: [200, 100, 200],
+    data: { url: data.url || '/apb-admin/index.html' }
+  };
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'АПБ Админ', options)
+  );
+});
+
+// Обработка клика по уведомлению
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(clients.openWindow(event.notification.data.url));
+});
+
+// Слушаем сообщения от страницы (для обновления)
 self.addEventListener('message', event => {
   if (event.data && event.data.action === 'skipWaiting') {
     self.skipWaiting();
