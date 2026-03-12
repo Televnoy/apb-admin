@@ -1,4 +1,4 @@
-const CACHE_NAME = 'apb-admin-v5';
+const CACHE_NAME = 'apb-admin-v3';
 const urlsToCache = [
   '/apb-admin/index.html',
   '/apb-admin/a-manifest.json',
@@ -20,7 +20,6 @@ self.addEventListener('fetch', event => {
     caches.match(event.request)
       .then(cachedResponse => {
         if (cachedResponse) {
-          // Возвращаем из кеша, но в фоне обновляем кеш
           event.waitUntil(
             fetch(event.request)
               .then(networkResponse => {
@@ -31,7 +30,6 @@ self.addEventListener('fetch', event => {
           );
           return cachedResponse;
         }
-        // Если нет в кеше, идём в сеть
         return fetch(event.request)
           .then(networkResponse => {
             const responseToCache = networkResponse.clone();
@@ -51,7 +49,6 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Обработка push-уведомлений
 self.addEventListener('push', event => {
   let data = {};
   if (event.data) {
