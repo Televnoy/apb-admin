@@ -173,41 +173,46 @@
         setAdminDeviceId(deviceId);
       }, []);
 
-// Получение и сохранение FCM токена
-React.useEffect(() => {
-  if (!adminDeviceId) return;
+      // Получение и сохранение FCM токена (исправленная версия)
+      React.useEffect(() => {
+        if (!adminDeviceId) return;
 
-  const setupFCM = async () => {
-    try {
-      const messaging = firebase.messaging();
-      
-      if (Notification.permission !== 'granted') {
-        await Notification.requestPermission();
-      }
-      
-      if (Notification.permission === 'granted') {
-        const vapidKey = 'BHZoy1QJ4PkloCIRFeKQ2UwYr44eziDY8C8wXqL4bSG6mbRGxQ03-v6vGJCmITc3jPWKfcq3Au3gVT860yIwNLg';
-        const token = await messaging.getToken({ vapidKey });
-        
-        if (token) {
-          await db.collection('adminFcmTokens').doc(adminDeviceId).set({
-            fcmToken: token,
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
-            userAgent: navigator.userAgent
-          }, { merge: true });
-          console.log('Admin FCM token saved');
-        }
-      }
-    } catch (err) {
-      console.error('FCM setup error:', err);
-    }
-  };
+        const setupFCM = async () => {
+          try {
+            // Ждём, пока наш основной Service Worker зарегистрируется и активируется
+            const registration = await navigator.serviceWorker.ready;
+            const messaging = firebase.messaging();
+            
+            if (Notification.permission !== 'granted') {
+              await Notification.requestPermission();
+            }
+            
+            if (Notification.permission === 'granted') {
+              const vapidKey = 'BHZoy1QJ4PkloCIRFeKQ2UwYr44eziDY8C8wXqL4bSG6mbRGxQ03-v6vGJCmITc3jPWKfcq3Au3gVT860yIwNLg';
+              const token = await messaging.getToken({ 
+                vapidKey,
+                serviceWorkerRegistration: registration 
+              });
+              
+              if (token) {
+                await db.collection('adminFcmTokens').doc(adminDeviceId).set({
+                  fcmToken: token,
+                  lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+                  userAgent: navigator.userAgent
+                }, { merge: true });
+                console.log('Admin FCM token saved');
+              }
+            }
+          } catch (err) {
+            console.error('FCM setup error:', err);
+          }
+        };
 
-  setupFCM();
+        setupFCM();
 
-  // Убираем onTokenRefresh, так как он вызывал ошибку
-  // При обновлении токена Firebase сам обновит его при следующем запуске приложения
-}, [adminDeviceId]);
+        // Убираем onTokenRefresh, так как он вызывал ошибку
+        // При обновлении токена Firebase сам обновит его при следующем запуске приложения
+      }, [adminDeviceId]);
 
       // Обработка входящих сообщений (когда приложение открыто)
       React.useEffect(() => {
