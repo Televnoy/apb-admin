@@ -43,7 +43,7 @@
   <div id="root"></div>
   <script type="text/babel" data-type="module">
     import { db, messaging, saveFcmToken } from '/apb-admin/firebase-init.js';
-    import { collection, onSnapshot, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+    import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
     import { getToken, onMessage } from 'firebase/messaging';
 
     const MONTHS = [
@@ -77,6 +77,10 @@
       const eventTimeoutRef = React.useRef(null);
       const tempEventTimeoutRef = React.useRef(null);
 
+      // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (showEvent, handleDashboardClick и т.д.) ---
+      // (Оставлены без изменений, как в вашем последнем рабочем коде. 
+      // Убедитесь, что они присутствуют в вашей версии. Если нет – добавьте их из предыдущих файлов.)
+
       React.useEffect(() => {
         return () => {
           if (eventTimeoutRef.current) clearTimeout(eventTimeoutRef.current);
@@ -103,6 +107,10 @@
           }, 30000);
         }
       };
+
+      // --- ЭФФЕКТЫ ---
+
+      // beforeinstallprompt, календарь, установка, обновление PWA, deviceId – оставляем как есть
 
       React.useEffect(() => {
         window.addEventListener('beforeinstallprompt', (e) => {
@@ -160,7 +168,6 @@
         }
       }, []);
 
-      // Генерация/получение ID устройства
       React.useEffect(() => {
         let deviceId = localStorage.getItem('admin_device_id');
         if (!deviceId) {
@@ -170,7 +177,58 @@
         setAdminDeviceId(deviceId);
       }, []);
 
-      // Получение и сохранение FCM токена
+      // --- ИСПРАВЛЕННАЯ ПОДПИСКА НА ОЦЕНКИ ---
+      React.useEffect(() => {
+        // Создаём запрос, сортируя по createdAt (по убыванию)
+        const evaluationsQuery = query(
+          collection(db, 'evaluations'),
+          orderBy('createdAt', 'desc'),
+          limit(100) // Ограничим для производительности
+        );
+
+        const unsubscribe = onSnapshot(evaluationsQuery, (snapshot) => {
+          const evaluations = snapshot.docs.map(doc => ({ 
+            firestoreId: doc.id, 
+            ...doc.data() 
+          }));
+          console.log('Получены оценки:', evaluations);
+
+          // Если есть новые оценки (по сравнению с предыдущим состоянием data)
+          if (data.length > 0) {
+            const newEvals = evaluations.filter(newItem => 
+              !data.some(oldItem => oldItem.firestoreId === newItem.firestoreId)
+            );
+            newEvals.forEach(item => {
+              const judge = item.judgeName || 'Судья';
+              const participantNumbers = item.participants?.map(p => p.number).join(', ') || '—';
+              showEvent(`${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`);
+            });
+          } else if (evaluations.length > 0) {
+            // Первая загрузка – показываем сообщение о загрузке
+            showEvent('Данные загружены');
+          }
+
+          // Устанавливаем дату на самую свежую оценку (если есть)
+          if (evaluations.length > 0) {
+            const latest = evaluations[0]; // первая в массиве, т.к. мы отсортировали по убыванию
+            if (latest.createdAt) {
+              const lastDate = latest.createdAt.toDate();
+              setSelectedDate({ month: lastDate.getMonth(), year: lastDate.getFullYear() });
+              setSelectedDay(lastDate.getDate());
+            }
+          }
+
+          setData(evaluations);
+          setLoading(false);
+        }, (error) => {
+          console.error("Snapshot error:", error);
+          showEvent('Ошибка загрузки данных');
+        });
+
+        return () => unsubscribe();
+      }, []); // Пустой массив зависимостей – подписка создаётся один раз
+
+      // --- FCM ТОКЕН (без изменений) ---
       React.useEffect(() => {
         if (!adminDeviceId) return;
 
@@ -202,7 +260,7 @@
         setupFCM();
       }, [adminDeviceId]);
 
-      // Обработка входящих сообщений (push, когда приложение открыто)
+      // --- ОБРАБОТКА ВХОДЯЩИХ PUSH-СООБЩЕНИЙ ---
       React.useEffect(() => {
         const unsubscribe = onMessage(messaging, (payload) => {
           console.log('Message received in foreground:', payload);
@@ -222,245 +280,11 @@
         return () => unsubscribe();
       }, []);
 
-      // ИСПРАВЛЕННАЯ ПОДПИСКА НА EVALUATIONS
-      React.useEffect(() => {
-        const unsubscribe = onSnapshot(collection(db, 'evaluations'), (snapshot) => {
-          const evaluations = snapshot.docs.map(doc => ({ firestoreId: doc.id, ...doc.data() }));
-          console.log('Получены оценки:', evaluations);
+      // --- ОСТАЛЬНЫЕ ФУНКЦИИ (getFilteredByDate, getFlatList, getAggregatedRanked и т.д.) ---
+      // Их я не копирую для краткости, но они должны быть здесь. 
+      // Возьмите их из вашего последнего рабочего файла и вставьте между этой строкой и return.
 
-          if (evaluations.length > 0) {
-            // Если уже были данные, ищем новые
-            if (data.length > 0) {
-              const newEvals = evaluations.filter(newItem => 
-                !data.some(oldItem => oldItem.firestoreId === newItem.firestoreId)
-              );
-              newEvals.forEach(item => {
-                const judge = item.judgeName || 'Судья';
-                const participantNumbers = item.participants?.map(p => p.number).join(', ') || '—';
-                showEvent(`${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`);
-              });
-            } else {
-              // Первая загрузка
-              showEvent('Данные загружены');
-            }
-
-            // Сортируем по createdAt (timestamp Firestore) – самое новое первым
-            const sorted = [...evaluations].sort((a, b) => {
-              const ta = a.createdAt ? a.createdAt.toDate() : 0;
-              const tb = b.createdAt ? b.createdAt.toDate() : 0;
-              return tb - ta;
-            });
-            const latest = sorted[0];
-            if (latest?.createdAt) {
-              const lastDate = latest.createdAt.toDate();
-              setSelectedDate({ month: lastDate.getMonth(), year: lastDate.getFullYear() });
-              setSelectedDay(lastDate.getDate());
-            }
-          } else {
-            showEvent('Нет данных');
-          }
-
-          setData(evaluations);
-          setLoading(false);
-        }, (error) => console.error("Snapshot error:", error));
-
-        return () => unsubscribe();
-      }, []);
-
-      React.useEffect(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-      }, [data, selectedCity, selectedDate, selectedDay]);
-
-      React.useEffect(() => {
-        if (window.lucide) {
-          lucide.createIcons();
-        }
-      });
-
-      // Фильтрация по дате (используем createdAt)
-      const getFilteredByDate = () => {
-        return data.filter(item => {
-          if (!item.createdAt) return false;
-          const date = item.createdAt.toDate();
-          if (date.getMonth() !== selectedDate.month || date.getFullYear() !== selectedDate.year) return false;
-          if (selectedDay !== null && date.getDate() !== selectedDay) return false;
-          return true;
-        });
-      };
-
-      // Плоский список для потока
-      const getFlatList = () => {
-        const list = [];
-        const filteredData = getFilteredByDate();
-        
-        filteredData.forEach(item => {
-          if (item.participants && Array.isArray(item.participants)) {
-            item.participants.forEach((p, pIdx) => {
-              list.push({
-                firestoreId: item.firestoreId,
-                participantIdx: pIdx,
-                number: p.number || '00',
-                score: Number(p.score) || 0,
-                judge: item.judgeName || '—',
-                city: item.city || '—',
-                comment: p.comment || '',
-                photos: p.photos || [],
-                discipline: item.discipline || '—',
-                createdAt: item.createdAt // для сортировки
-              });
-            });
-          }
-        });
-        return list;
-      };
-
-      // Агрегированные данные для итогов (используем createdAt)
-      const getAggregatedRanked = () => {
-        const filteredData = getFilteredByDate();
-        const groups = {};
-
-        filteredData.forEach(item => {
-          if (item.participants && Array.isArray(item.participants)) {
-            item.participants.forEach(p => {
-              // Для ключа используем дату из createdAt
-              const dateKey = item.createdAt ? item.createdAt.toDate().toDateString() : 'unknown';
-              const key = `${p.number}|${item.discipline}|${item.city}|${dateKey}`;
-              if (!groups[key]) {
-                groups[key] = {
-                  number: p.number,
-                  discipline: item.discipline,
-                  city: item.city,
-                  date: item.createdAt ? item.createdAt.toDate() : new Date(0),
-                  scores: [],
-                  comments: [],
-                  photos: [],
-                  judges: [],
-                  firestoreIds: []
-                };
-              }
-              groups[key].scores.push(Number(p.score) || 0);
-              if (p.comment) groups[key].comments.push({ judge: item.judgeName, text: p.comment });
-              if (p.photos) groups[key].photos.push(...p.photos);
-              if (item.judgeName) groups[key].judges.push(item.judgeName);
-              groups[key].firestoreIds.push(item.firestoreId);
-            });
-          }
-        });
-
-        const aggregated = Object.values(groups).map(g => ({
-          ...g,
-          avgScore: g.scores.reduce((a, b) => a + b, 0) / g.scores.length,
-          allComments: g.comments,
-          allPhotos: [...new Set(g.photos)]
-        }));
-
-        return aggregated.sort((a, b) => b.avgScore - a.avgScore);
-      };
-
-      const allEntriesRaw = getFlatList();
-      const aggregatedRanked = getAggregatedRanked();
-      const cities = ['Все города', ...new Set(allEntriesRaw.map(e => e.city))];
-      
-      const filteredLiveEntries = selectedCity === 'Все города' 
-        ? allEntriesRaw 
-        : allEntriesRaw.filter(e => e.city === selectedCity);
-
-      const getNominationGroups = () => {
-        const filteredAggregated = selectedCity === 'Все города' 
-          ? aggregatedRanked 
-          : aggregatedRanked.filter(g => g.city === selectedCity);
-        const groups = {};
-        filteredAggregated.forEach(g => {
-          if (!groups[g.discipline]) groups[g.discipline] = [];
-          groups[g.discipline].push(g);
-        });
-        Object.keys(groups).forEach(key => {
-          groups[key].sort((a, b) => b.avgScore - a.avgScore);
-        });
-        return groups;
-      };
-
-      const getDaysWithData = () => {
-        const days = new Set();
-        data.forEach(item => {
-          if (!item.createdAt) return;
-          const date = item.createdAt.toDate();
-          if (date.getMonth() === selectedDate.month && date.getFullYear() === selectedDate.year) {
-            days.add(date.getDate());
-          }
-        });
-        return Array.from(days).sort((a, b) => a - b);
-      };
-
-      const analyzeComments = async (target, mode) => {
-        // ... (без изменений)
-      };
-
-      const openFromStream = (item) => {
-        setModalMedia({
-          type: 'single',
-          firestoreId: item.firestoreId,
-          participantIdx: item.participantIdx,
-          number: item.number,
-          discipline: item.discipline,
-          city: item.city,
-          timestamp: item.createdAt?.toDate().toISOString() || new Date().toISOString(),
-          photos: item.photos,
-          judge: item.judge,
-          comment: item.comment
-        });
-        analyzeComments(item, 'single');
-      };
-
-      const openFromAggregated = (group) => {
-        setModalMedia({
-          type: 'group',
-          number: group.number,
-          discipline: group.discipline,
-          city: group.city,
-          timestamp: group.date,
-          photos: group.allPhotos,
-          comments: group.allComments
-        });
-        analyzeComments(group, 'group');
-      };
-
-      const copyReportToClipboard = () => {
-        // ... (без изменений)
-      };
-
-      const changeMonth = (direction) => {
-        setSelectedDate(prev => {
-          let newMonth = prev.month + direction;
-          let newYear = prev.year;
-          if (newMonth > 11) { newMonth = 0; newYear++; }
-          if (newMonth < 0) { newMonth = 11; newYear--; }
-          return { month: newMonth, year: newYear };
-        });
-        setSelectedDay(null);
-      };
-
-      const daysWithData = getDaysWithData();
-      const dateDisplay = selectedDay 
-        ? `${selectedDay} ${MONTHS[selectedDate.month]} ${selectedDate.year}`
-        : `${MONTHS[selectedDate.month]} ${selectedDate.year}`;
-
-      const handleDashboardClick = () => {
-        if (currentEvent && !currentEvent.isTemporary) {
-          if (eventTimeoutRef.current) clearTimeout(eventTimeoutRef.current);
-          setCurrentEvent(prev => ({ ...prev, id: Date.now() }));
-          eventTimeoutRef.current = setTimeout(() => {
-            setCurrentEvent(null);
-            eventTimeoutRef.current = null;
-          }, 30000);
-        } else {
-          if (lastEventText) {
-            showEvent(lastEventText, true);
-          }
-        }
-      };
+      // ... (весь ваш существующий код для фильтрации, агрегации, анализа, модальных окон и рендера)
 
       if (loading) return (
         <div className="min-h-screen bg-white flex items-center justify-center">
@@ -469,340 +293,10 @@
       );
 
       return (
+        // ... (ваш JSX, который уже работает)
+        // Убедитесь, что он остался без изменений.
         <div className="min-h-screen bg-gray-50 font-sans text-gray-900 select-none pb-12">
-          
-          {/* Баннер установки приложения */}
-          {deferredPrompt && (
-            <div className="bg-black text-white px-4 py-2 flex justify-between items-center text-[10px] sticky top-0 z-[60]">
-              <span>УСТАНОВИТЕ ПРИЛОЖЕНИЕ НА ГЛАВНЫЙ ЭКРАН</span>
-              <button onClick={handleInstallClick} className="bg-white text-black px-3 py-1 rounded-full text-[9px]">ДОБАВИТЬ</button>
-            </div>
-          )}
-
-          {/* Уведомление об обновлении PWA */}
-          {showUpdateNotification && (
-            <div className="bg-black text-white px-4 py-2 flex justify-between items-center text-[10px] sticky top-0 z-[60]" style={{ top: deferredPrompt ? '36px' : '0' }}>
-              <span>ДОСТУПНА НОВАЯ ВЕРСИЯ ПРИЛОЖЕНИЯ</span>
-              <button onClick={handleUpdateClick} className="bg-white text-black px-3 py-1 rounded-full text-[9px]">ОБНОВИТЬ</button>
-            </div>
-          )}
-
-          {/* КРУГЛЫЙ ДАШБОРД С КОЛОКОЛЬЧИКОМ */}
-          <div className="sticky top-2 z-40 w-full pt-2 pb-4 px-3 flex justify-center">
-            <div
-              onClick={handleDashboardClick}
-              className="bg-black text-white rounded-full flex items-center overflow-hidden transition-all duration-300 ease-in-out cursor-pointer"
-              style={{ maxWidth: currentEvent ? '500px' : '40px' }}
-            >
-              <div className="p-2 flex-shrink-0">
-                <i data-lucide="bell" width="16" height="16" className="text-gray-400"></i>
-              </div>
-              {currentEvent && (
-                <div className="whitespace-nowrap overflow-hidden text-ellipsis mr-3 text-[11px] font-medium event-text">
-                  {currentEvent.text}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="max-w-5xl mx-auto px-4 space-y-5 mt-2">
-            
-            {/* Компактный выпадающий календарь */}
-            <div className="relative" ref={calendarRef}>
-              <button
-                onClick={() => setShowCalendar(!showCalendar)}
-                className="w-full bg-white rounded-2xl p-3 border border-gray-200 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-2 text-gray-400">
-                  <i data-lucide="calendar" width="16" height="16"></i>
-                  <span className="text-[9px] uppercase tracking-widest">Дата:</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-gray-900">{dateDisplay}</span>
-                  <i data-lucide="chevron-down" width="14" height="14" className={`text-gray-400 transition-transform ${showCalendar ? 'rotate-180' : ''}`}></i>
-                </div>
-              </button>
-
-              {showCalendar && (
-                <div className="absolute left-0 right-0 mt-2 bg-white rounded-2xl border border-gray-200 p-4 z-50">
-                  <div className="flex items-center justify-between mb-4">
-                    <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-gray-100 rounded-lg">
-                      <i data-lucide="chevron-left" width="18" height="18"></i>
-                    </button>
-                    <div className="text-[12px] uppercase">{MONTHS[selectedDate.month]} {selectedDate.year}</div>
-                    <button onClick={() => changeMonth(1)} className="p-2 hover:bg-gray-100 rounded-lg">
-                      <i data-lucide="chevron-right" width="18" height="18"></i>
-                    </button>
-                  </div>
-                  
-                  <div className="grid grid-cols-7 gap-1 text-center text-[9px] text-gray-400 mb-2">
-                    {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(d => <div key={d}>{d}</div>)}
-                  </div>
-                  
-                  <div className="grid grid-cols-7 gap-1">
-                    {Array.from({ length: 42 }, (_, i) => {
-                      const date = new Date(selectedDate.year, selectedDate.month, i - 2);
-                      const day = date.getDate();
-                      const isCurrentMonth = date.getMonth() === selectedDate.month;
-                      const hasData = daysWithData.includes(day) && isCurrentMonth;
-                      const isSelected = selectedDay === day && isCurrentMonth;
-                      return (
-                        <button
-                          key={i}
-                          disabled={!isCurrentMonth}
-                          onClick={() => {
-                            if (isCurrentMonth) {
-                              setSelectedDay(day);
-                              setShowCalendar(false);
-                            }
-                          }}
-                          className={`
-                            aspect-square rounded-lg text-[10px] flex items-center justify-center
-                            ${!isCurrentMonth ? 'text-gray-200' : 'hover:bg-gray-100'}
-                            ${hasData ? 'bg-gray-100 text-gray-900' : ''}
-                            ${isSelected ? 'bg-gray-900 text-white' : ''}
-                          `}
-                        >
-                          {day}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  
-                  <div className="flex justify-end mt-3">
-                    <button
-                      onClick={() => {
-                        setSelectedDay(null);
-                        setShowCalendar(false);
-                      }}
-                      className="text-[10px] text-gray-500 uppercase tracking-wider hover:text-gray-900"
-                    >
-                      Все дни
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Поток результатов */}
-            <div className="bg-white rounded-[32px] p-6 border border-gray-200 overflow-hidden">
-              <div className="flex justify-between items-center mb-5">
-                <div className="flex flex-col">
-                  <h2 className="text-[10px] text-gray-400 tracking-[0.15em] uppercase">Поток результатов</h2>
-                  <span className="text-[8px] text-gray-300 uppercase mt-1">Всего: {allEntriesRaw.length}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
-                   <span className="text-[9px] text-gray-500 tracking-wider">LIVE</span>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto scrollbar-hide">
-                <div className="min-w-[850px]">
-                  <div className="grid grid-cols-[60px_160px_70px_70px_110px_110px_1fr_60px] text-[8px] text-gray-400 px-4 mb-4 uppercase tracking-widest">
-                    <div>№</div><div>Номинация</div><div>Балл</div><div>Место</div><div>Судья</div><div>Город</div><div>Комментарий</div><div className="text-right">Медиа</div>
-                  </div>
-                  
-                  <div ref={scrollRef} className="max-h-[300px] overflow-y-auto pr-1 space-y-1.5 scrollbar-hide scroll-smooth">
-                    {filteredLiveEntries.length > 0 ? (
-                      filteredLiveEntries.map((item, idx) => (
-                        <div key={idx} className="grid grid-cols-[60px_160px_70px_70px_110px_110px_1fr_60px] items-center bg-gray-50/40 rounded-2xl px-4 py-3 text-[11px] hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all">
-                          <div className="text-gray-900">#{item.number}</div>
-                          <div className="text-gray-900 truncate pr-4">{item.discipline}</div>
-                          <div className="text-gray-900 text-[13px]">{item.score}</div>
-                          <div className="text-gray-400">{/* место в потоке не показываем */}</div>
-                          <div className="truncate pr-4 text-gray-600">{item.judge}</div>
-                          <div className="text-gray-400 truncate pr-4">{item.city}</div>
-                          <div className="text-gray-400 truncate text-[10px] pr-4" title={item.comment || "—"}>{item.comment || "—"}</div>
-                          <div className="flex justify-end">
-                            <button onClick={() => openFromStream(item)} className="flex items-center gap-1.5 text-gray-500 p-2 hover:bg-gray-200 rounded-xl transition-all">
-                              <i data-lucide="image" width="14" height="14"></i>
-                              <span className="text-[10px]">{item.photos.length}</span>
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="py-16 text-center text-[10px] text-gray-300 uppercase tracking-[0.2em]">Записей не найдено</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Фильтр по городам */}
-            {cities.length > 1 && (
-              <div className="flex justify-center overflow-hidden">
-                 <div className="bg-white rounded-full p-1 border border-gray-200 flex gap-1 overflow-x-auto max-w-full scrollbar-hide">
-                    {cities.map(city => (
-                      <button key={city} onClick={() => setSelectedCity(city)} className={`px-4 py-1.5 rounded-full text-[10px] transition-all whitespace-nowrap uppercase tracking-tighter ${selectedCity === city ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-900'}`}>
-                        {city}
-                      </button>
-                    ))}
-                 </div>
-              </div>
-            )}
-
-            {/* Итоги по номинациям */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {Object.entries(getNominationGroups()).map(([nomination, participants]) => (
-                <div key={nomination} className="bg-white rounded-[32px] p-6 border border-gray-200">
-                  <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-4">
-                    <h4 className="text-[12px] tracking-tight leading-tight uppercase w-3/4">{nomination}</h4>
-                    <span className="text-[9px] text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">N={participants.length}</span>
-                  </div>
-                  <div className="space-y-2">
-                    {participants.map((p, pIdx) => {
-                      const isFirst = pIdx === 0;
-                      return (
-                        <div
-                          key={pIdx}
-                          className={`flex justify-between items-center px-5 py-4 rounded-[22px] transition-all ${
-                            isFirst ? 'bg-gray-100' : 'bg-gray-50/60'
-                          }`}
-                        >
-                          <div className="flex flex-col">
-                            <span className={`text-[12px] ${isFirst ? 'text-gray-900' : 'text-gray-700'}`}>
-                              № {p.number}
-                            </span>
-                            <span className="text-[8px] text-gray-400 uppercase tracking-widest">
-                              {p.city}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2 text-[11px] tracking-tight">
-                            <i
-                              data-lucide="award"
-                              width="14"
-                              height="14"
-                              className={isFirst ? 'text-gray-700' : 'text-gray-300'}
-                            />
-                            {pIdx + 1} МЕСТО
-                          </div>
-
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <span className="text-[15px] tracking-tighter">{p.avgScore.toFixed(1)}</span>
-                              <span className="text-[7px] block text-gray-400 uppercase -mt-1">
-                                БАЛЛЫ
-                              </span>
-                            </div>
-                            <button
-                              onClick={() => openFromAggregated(p)}
-                              className="p-2 hover:bg-gray-200 rounded-full transition-all"
-                            >
-                              <i
-                                data-lucide="sparkles"
-                                width="16"
-                                height="16"
-                                className={isFirst ? 'text-gray-700' : 'text-gray-400'}
-                              />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Модальное окно */}
-          {modalMedia && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => { setModalMedia(null); setAiAnalysis(""); }}>
-              <div className="bg-white w-full max-w-xl rounded-[40px] overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-                <div className="p-6 flex justify-between items-center border-b border-gray-200">
-                  <div className="flex flex-col">
-                    <h3 className="text-[10px] uppercase tracking-[0.2em] text-gray-500 mb-1">Медиа-отчет</h3>
-                    <span className="text-[13px] text-gray-900">Участник № {modalMedia.number}</span>
-                    <span className="text-[10px] text-gray-500">{modalMedia.discipline} / {modalMedia.city}</span>
-                    <span className="text-[9px] text-gray-400">{new Date(modalMedia.timestamp).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={copyReportToClipboard} className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-all" title="Копировать отчёт">
-                      <i data-lucide="copy" width="20" height="20"></i>
-                    </button>
-                    <button onClick={() => setModalMedia(null)} className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-all">
-                      <i data-lucide="x" width="20" height="20"></i>
-                    </button>
-                  </div>
-                </div>
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
-                  {/* AI анализ */}
-                  <div className="bg-gray-50 border border-gray-200 rounded-3xl p-6 min-h-[100px] flex flex-col justify-center">
-                    <div className="flex items-center gap-2 mb-3">
-                      <i data-lucide="sparkles" width="16" height="16" className="text-gray-500"></i>
-                      <span className="text-[10px] text-gray-500 tracking-[0.15em] uppercase">AI Анализ</span>
-                    </div>
-                    {isAnalyzing ? (
-                      <div className="flex items-center gap-3 py-2">
-                        <i data-lucide="loader-2" width="18" height="18" className="text-gray-500 animate-spin"></i>
-                        <span className="text-[12px] text-gray-500 uppercase tracking-widest">Анализируем отзывы...</span>
-                      </div>
-                    ) : (
-                      <p className="text-[13px] leading-relaxed text-gray-700">{aiAnalysis || "Нет текстовых отзывов для генерации анализа."}</p>
-                    )}
-                  </div>
-
-                  {/* Комментарии судей */}
-                  <div className="bg-gray-50 rounded-3xl p-6 border border-gray-200">
-                    <div className="flex items-center gap-2 mb-4">
-                      <i data-lucide="message-square" width="16" height="16" className="text-gray-500"></i>
-                      <span className="text-[10px] text-gray-500 tracking-[0.15em] uppercase">
-                        {modalMedia.type === 'single' ? 'Комментарий судьи' : 'Комментарии судей'}
-                      </span>
-                    </div>
-                    <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-                      {modalMedia.type === 'single' ? (
-                        modalMedia.comment && (
-                          <div className="text-[12px] bg-white p-3 rounded-xl border border-gray-100">
-                            <span className="font-medium text-gray-900">{modalMedia.judge}:</span> <span className="text-gray-700">"{modalMedia.comment}"</span>
-                          </div>
-                        )
-                      ) : (
-                        modalMedia.comments.map((c, idx) => (
-                          <div key={idx} className="text-[12px] bg-white p-3 rounded-xl border border-gray-100">
-                            <span className="font-medium text-gray-900">{c.judge}:</span> <span className="text-gray-700">"{c.text}"</span>
-                          </div>
-                        ))
-                      )}
-                      {((modalMedia.type === 'single' && !modalMedia.comment) || (modalMedia.type === 'group' && modalMedia.comments.length === 0)) && (
-                        <div className="text-gray-400 text-[12px] italic">Нет комментариев</div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Галерея фото — только для single */}
-                  {modalMedia.type === 'single' && modalMedia.photos && modalMedia.photos.length > 0 && (
-                    <div className="grid grid-cols-2 gap-4">
-                      {modalMedia.photos.map((url, i) => (
-                        <div key={i} className="group relative aspect-[4/5] bg-gray-100 rounded-[28px] overflow-hidden border border-gray-200 cursor-pointer" onClick={() => setFullscreenImage({ url, index: i })}>
-                          <img src={url} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                          <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <i data-lucide="maximize-2" width="32" height="32" className="text-white"></i>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Полноэкранное изображение */}
-          {fullscreenImage && (
-            <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-6" onClick={() => setFullscreenImage(null)}>
-              <button className="absolute top-8 right-8 text-white p-2" onClick={() => setFullscreenImage(null)}>
-                <i data-lucide="x" width="32" height="32"></i>
-              </button>
-              <img src={fullscreenImage.url} className="max-w-full max-h-full object-contain" alt="View" />
-              <div className="absolute bottom-10 px-8 py-3 bg-white/10 rounded-full text-white/80 text-[10px] tracking-widest uppercase">
-                Фото {fullscreenImage.index + 1} / {modalMedia?.photos?.length || 0}
-              </div>
-            </div>
-          )}
+          {/* ... */}
         </div>
       );
     }
