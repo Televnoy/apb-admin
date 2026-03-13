@@ -16,7 +16,6 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Пропускаем POST-запросы – не пытаемся их кэшировать
   if (event.request.method !== 'GET') {
     event.respondWith(fetch(event.request));
     return;
@@ -26,7 +25,6 @@ self.addEventListener('fetch', event => {
     caches.match(event.request)
       .then(cachedResponse => {
         if (cachedResponse) {
-          // Фоновое обновление кэша
           event.waitUntil(
             fetch(event.request)
               .then(networkResponse => {
@@ -37,7 +35,6 @@ self.addEventListener('fetch', event => {
           );
           return cachedResponse;
         }
-        // Нет в кэше – идём в сеть и кэшируем ответ
         return fetch(event.request)
           .then(networkResponse => {
             const responseToCache = networkResponse.clone();
@@ -57,24 +54,40 @@ self.addEventListener('activate', event => {
   );
 });
 
+// Исправленный обработчик push-уведомлений
 self.addEventListener('push', event => {
+  let title = 'АПБ Админ';
+  let body = 'Новое событие';
   let data = {};
+
   if (event.data) {
     try {
-      data = event.data.json();
+      const payload = event.data.json();
+      // Если есть поле notification, используем его
+      if (payload.notification) {
+        title = payload.notification.title || title;
+        body = payload.notification.body || body;
+      } else if (payload.data) {
+        // Иначе пробуем взять из data
+        title = payload.data.title || title;
+        body = payload.data.body || body;
+        data = payload.data;
+      }
     } catch {
-      data = { title: 'Новое событие', body: event.data.text() };
+      // Если не JSON, используем текст как есть
+      body = event.data.text() || body;
     }
   }
+
   const options = {
-    body: data.body || 'Обновите приложение',
+    body: body,
     icon: '/apb-admin/aicon-192.png',
     badge: '/apb-admin/aicon-72.png',
     vibrate: [200, 100, 200],
     data: { url: data.url || '/apb-admin/index.html' }
   };
   event.waitUntil(
-    self.registration.showNotification(data.title || 'АПБ Админ', options)
+    self.registration.showNotification(title, options)
   );
 });
 
