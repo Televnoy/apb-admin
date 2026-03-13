@@ -1,4 +1,4 @@
-const CACHE_NAME = 'apb-admin-v5,';
+const CACHE_NAME = 'apb-admin-v6,';
 const urlsToCache = [
   '/apb-admin/index.html',
   '/apb-admin/a-manifest.json',
