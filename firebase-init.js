@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { getMessaging } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDSrWUBYjqYpA6CgG-tn0B2E_h9HN2wgZ8",
@@ -16,14 +16,12 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const messaging = getMessaging(app);
 
-const adminFcmTokensRef = collection(db, 'adminFcmTokens');
-
 const saveFcmToken = async (deviceId, token, userAgent) => {
-  await setDoc(doc(adminFcmTokensRef, deviceId), {
+  await setDoc(doc(db, 'adminFcmTokens', deviceId), {
     fcmToken: token,
     lastUpdated: serverTimestamp(),
     userAgent
   }, { merge: true });
 };
 
-export { db, messaging, adminFcmTokensRef, saveFcmToken };
+export { db, messaging, saveFcmToken };
