@@ -239,52 +239,57 @@
         return () => unsubscribe();
       }, []);
 
-      // --- ПОДПИСКА НА КОЛЛЕКЦИЮ EVALUATIONS ---
-      React.useEffect(() => {
-        const evaluationsQuery = query(
-          collection(db, 'evaluations'),
-          orderBy('createdAt', 'desc'),
-          limit(100)
-        );
+// --- ПОДПИСКА НА КОЛЛЕКЦИЮ EVALUATIONS ---
+React.useEffect(() => {
+  const evaluationsQuery = query(
+    collection(db, 'evaluations'),
+    orderBy('createdAt', 'desc'),
+    limit(100)
+  );
 
-        const unsubscribe = onSnapshot(evaluationsQuery, (snapshot) => {
-          const evaluations = snapshot.docs.map(doc => ({
-            firestoreId: doc.id,
-            ...doc.data()
-          }));
-          console.log('Получены оценки:', evaluations);
+  const unsubscribe = onSnapshot(evaluationsQuery, (snapshot) => {
+    const evaluations = snapshot.docs.map(doc => ({
+      firestoreId: doc.id,
+      ...doc.data()
+    }));
+    console.log('🔥 Получены оценки:', evaluations.length, 'документов');
+    evaluations.forEach(e => console.log('   ', e.judgeName, e.participants?.[0]?.number));
 
-          if (data.length > 0) {
-            const newEvals = evaluations.filter(newItem =>
-              !data.some(oldItem => oldItem.firestoreId === newItem.firestoreId)
-            );
-            newEvals.forEach(item => {
-              const judge = item.judgeName || 'Судья';
-              const participantNumbers = item.participants?.map(p => p.number).join(', ') || '—';
-              showEvent(`${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`);
-            });
-          } else if (evaluations.length > 0) {
-            showEvent('Данные загружены');
-          }
+    if (data.length > 0) {
+      const newEvals = evaluations.filter(newItem =>
+        !data.some(oldItem => oldItem.firestoreId === newItem.firestoreId)
+      );
+      console.log('🆕 Новые оценки:', newEvals.length);
+      newEvals.forEach(item => {
+        const judge = item.judgeName || 'Судья';
+        const participantNumbers = item.participants?.map(p => p.number).join(', ') || '—';
+        const text = `${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`;
+        console.log('📢 Показываем событие:', text);
+        showEvent(text);
+      });
+    } else if (evaluations.length > 0) {
+      console.log('ℹ️ Первая загрузка, показываем "Данные загружены"');
+      showEvent('Данные загружены');
+    }
 
-          if (evaluations.length > 0) {
-            const latest = evaluations[0];
-            if (latest.createdAt) {
-              const lastDate = latest.createdAt.toDate();
-              setSelectedDate({ month: lastDate.getMonth(), year: lastDate.getFullYear() });
-              setSelectedDay(lastDate.getDate());
-            }
-          }
+    if (evaluations.length > 0) {
+      const latest = evaluations[0];
+      if (latest.createdAt) {
+        const lastDate = latest.createdAt.toDate();
+        setSelectedDate({ month: lastDate.getMonth(), year: lastDate.getFullYear() });
+        setSelectedDay(lastDate.getDate());
+      }
+    }
 
-          setData(evaluations);
-          setLoading(false);
-        }, (error) => {
-          console.error("Snapshot error:", error);
-          showEvent('Ошибка загрузки данных');
-        });
+    setData(evaluations);
+    setLoading(false);
+  }, (error) => {
+    console.error("❌ Snapshot error:", error);
+    showEvent('Ошибка загрузки данных');
+  });
 
-        return () => unsubscribe();
-      }, []);
+  return () => unsubscribe();
+}, []);
 
       // --- ПРОКРУТКА ВНИЗ ПРИ ОБНОВЛЕНИИ ---
       React.useEffect(() => {
