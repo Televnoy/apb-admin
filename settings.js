@@ -1,4 +1,4 @@
-import { db, messaging, saveFcmToken, removeFcmToken } from '/apb-admin/firebase-init.js';
+import { db, messaging, saveFcmToken, removeFcmToken, getJudges, updateJudgeDevice, createJudgeKey, deleteJudgeKey } from '/apb-admin/firebase-init.js';
 import { getToken } from 'firebase/messaging';
 
 export function Settings({ show, onClose, adminDeviceId }) {
@@ -7,14 +7,78 @@ export function Settings({ show, onClose, adminDeviceId }) {
     return saved === null ? true : saved === 'true';
   });
 
+  const [judges, setJudges] = React.useState([]);
+  const [loadingJudges, setLoadingJudges] = React.useState(false);
+  const [generating, setGenerating] = React.useState(false);
+  const [copiedKey, setCopiedKey] = React.useState(null);
+
+  React.useEffect(() => {
+    if (show) {
+      loadJudges();
+    }
+  }, [show]);
+
+  const loadJudges = async () => {
+    setLoadingJudges(true);
+    try {
+      const judgesList = await getJudges();
+      setJudges(judgesList);
+    } catch (err) {
+      console.error('Ошибка загрузки ключей:', err);
+    } finally {
+      setLoadingJudges(false);
+    }
+  };
+
+  const handleDeviceToggle = async (judgeKey, currentDeviceId, checked) => {
+    if (!checked) {
+      try {
+        await updateJudgeDevice(judgeKey, null);
+        setJudges(prev => prev.map(j => 
+          j.key === judgeKey ? { ...j, deviceId: null } : j
+        ));
+      } catch (err) {
+        console.error('Ошибка отвязки устройства:', err);
+      }
+    } else {
+      console.log('Для привязки устройства необходим вход с этим ключом.');
+    }
+  };
+
+  const handleGenerateKey = async () => {
+    setGenerating(true);
+    try {
+      const newKey = await createJudgeKey();
+      await loadJudges();
+    } catch (err) {
+      console.error('Ошибка создания ключа:', err);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleCopyKey = (key) => {
+    navigator.clipboard.writeText(key).then(() => {
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
+    }).catch(err => console.error('Ошибка копирования:', err));
+  };
+
+  const handleDeleteKey = async (judgeKey) => {
+    if (window.confirm(`Вы уверены, что хотите удалить ключ ${judgeKey}? Это действие нельзя отменить.`)) {
+      try {
+        await deleteJudgeKey(judgeKey);
+        setJudges(prev => prev.filter(j => j.key !== judgeKey));
+      } catch (err) {
+        console.error('Ошибка удаления ключа:', err);
+      }
+    }
+  };
+
   React.useEffect(() => {
     if (!adminDeviceId) return;
 
-    const handleToggle = async () => {
-      if (!messaging) {
-        console.error('messaging is not defined – проверьте firebase-init.js');
-        return;
-      }
+    const handlePushToggle = async () => {
       if (pushEnabled) {
         try {
           const registration = await navigator.serviceWorker.ready;
@@ -45,7 +109,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
       }
     };
 
-    handleToggle();
+    handlePushToggle();
   }, [pushEnabled, adminDeviceId]);
 
   if (!show) return null;
@@ -53,18 +117,19 @@ export function Settings({ show, onClose, adminDeviceId }) {
   return React.createElement(
     'div',
     {
-      className: 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80',
+      className: 'fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80',
       onClick: onClose
     },
     React.createElement(
       'div',
       {
-        className: 'bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl space-y-6 border border-gray-100',
+        className: 'bg-white w-full max-w-4xl rounded-[32px] p-8 shadow-2xl space-y-6 border border-gray-100 max-h-[90vh] overflow-y-auto',
         onClick: (e) => e.stopPropagation()
       },
+      // Заголовок
       React.createElement(
         'div',
-        { className: 'flex justify-between items-center' },
+        { className: 'flex justify-between items-center sticky top-0 bg-white pb-4 border-b border-gray-100' },
         React.createElement('h2', { className: 'text-xl font-light tracking-tight' }, 'Настройки'),
         React.createElement(
           'button',
@@ -72,6 +137,8 @@ export function Settings({ show, onClose, adminDeviceId }) {
           React.createElement('i', { 'data-lucide': 'x', width: '24', height: '24' })
         )
       ),
+      
+      // Блок push-уведомлений
       React.createElement(
         'div',
         { className: 'space-y-6' },
@@ -100,6 +167,123 @@ export function Settings({ show, onClose, adminDeviceId }) {
           'p',
           { className: 'text-[10px] text-gray-400 uppercase tracking-wider' },
           'Включите, чтобы получать уведомления о новых оценках даже когда приложение закрыто.'
+        )
+      ),
+
+      React.createElement('hr', { className: 'border-gray-100' }),
+
+      // Блок управления ключами
+      React.createElement(
+        'div',
+        { className: 'space-y-4' },
+        React.createElement('h3', { className: 'text-[11px] font-medium uppercase tracking-widest text-gray-500' }, 'Управление ключами судей'),
+        
+        React.createElement(
+          'div',
+          { className: 'overflow-x-auto' },
+          React.createElement(
+            'table',
+            { className: 'min-w-full text-[11px]' },
+            React.createElement(
+              'thead',
+              { className: 'bg-gray-50 border-b border-gray-100' },
+              React.createElement(
+                'tr',
+                null,
+                React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Ключ'),
+                React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Имя'),
+                React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Город'),
+                React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'ID устройства'),
+                React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Отвязать'),
+                React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Действия')
+              )
+            ),
+            React.createElement(
+              'tbody',
+              { className: 'divide-y divide-gray-50' },
+              loadingJudges
+                ? React.createElement(
+                    'tr',
+                    null,
+                    React.createElement('td', { colSpan: 6, className: 'px-4 py-4 text-center text-gray-400' }, 'Загрузка...')
+                  )
+                : judges.length === 0
+                ? React.createElement(
+                    'tr',
+                    null,
+                    React.createElement('td', { colSpan: 6, className: 'px-4 py-4 text-center text-gray-400' }, 'Нет ключей')
+                  )
+                : judges.map((judge) =>
+                    React.createElement(
+                      'tr',
+                      { key: judge.key, className: 'hover:bg-gray-50' },
+                      React.createElement('td', { className: 'px-4 py-3 font-mono text-[10px]' }, 
+                        React.createElement(
+                          'div',
+                          { className: 'flex items-center gap-1' },
+                          React.createElement('span', { className: 'truncate max-w-[100px]' }, judge.key),
+                          React.createElement(
+                            'button',
+                            {
+                              onClick: () => handleCopyKey(judge.key),
+                              className: 'text-gray-400 hover:text-black',
+                              title: 'Копировать ключ'
+                            },
+                            React.createElement('i', { 'data-lucide': 'copy', width: '14', height: '14' })
+                          ),
+                          copiedKey === judge.key && React.createElement('span', { className: 'text-green-500 text-[9px]' }, 'Скопировано')
+                        )
+                      ),
+                      React.createElement('td', { className: 'px-4 py-3' }, judge.displayName || '—'),
+                      React.createElement('td', { className: 'px-4 py-3' }, judge.city || '—'),
+                      React.createElement('td', { className: 'px-4 py-3 text-[10px]' }, judge.deviceId ? judge.deviceId.substring(0, 12) + '…' : '—'),
+                      React.createElement(
+                        'td',
+                        { className: 'px-4 py-3' },
+                        React.createElement(
+                          'label',
+                          { className: 'relative inline-flex items-center cursor-pointer' },
+                          React.createElement('input', {
+                            type: 'checkbox',
+                            className: 'sr-only peer',
+                            checked: !!judge.deviceId,
+                            onChange: (e) => handleDeviceToggle(judge.key, judge.deviceId, e.target.checked)
+                          }),
+                          React.createElement('div', { className: 'w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-black transition' }),
+                          React.createElement('div', { className: 'absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5' })
+                        )
+                      ),
+                      React.createElement(
+                        'td',
+                        { className: 'px-4 py-3' },
+                        React.createElement(
+                          'button',
+                          {
+                            onClick: () => handleDeleteKey(judge.key),
+                            className: 'text-red-400 hover:text-red-600',
+                            title: 'Удалить ключ'
+                          },
+                          React.createElement('i', { 'data-lucide': 'trash-2', width: '16', height: '16' })
+                        )
+                      )
+                    )
+                  )
+            )
+          )
+        ),
+
+        React.createElement(
+          'div',
+          { className: 'flex justify-end mt-4' },
+          React.createElement(
+            'button',
+            {
+              onClick: handleGenerateKey,
+              disabled: generating,
+              className: 'bg-black text-white px-4 py-2 rounded-full text-[10px] font-medium uppercase tracking-wider hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed'
+            },
+            generating ? 'Генерация...' : 'Сгенерировать ключ'
+          )
         )
       )
     )
