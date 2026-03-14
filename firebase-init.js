@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, setDoc, deleteDoc, serverTimestamp, collection, getDocs, updateDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, deleteDoc, serverTimestamp, collection, getDocs, updateDoc, getDoc } from 'firebase/firestore';
 import { getMessaging } from 'firebase/messaging';
 
 const firebaseConfig = {
@@ -44,8 +44,19 @@ const updateJudgeDevice = async (judgeKey, deviceId) => {
 };
 
 const createJudgeKey = async (initialData = {}) => {
-  // Генерируем случайный ключ
-  const newKey = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+  // Генерируем 6-символьный ключ
+  let newKey;
+  let exists = true;
+  let attempts = 0;
+  while (exists && attempts < 10) {
+    newKey = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const docRef = doc(db, 'judges', newKey);
+    const snap = await getDoc(docRef);
+    exists = snap.exists();
+    attempts++;
+  }
+  if (exists) throw new Error('Не удалось сгенерировать уникальный ключ');
+
   const docRef = doc(db, 'judges', newKey);
   await setDoc(docRef, {
     displayName: initialData.displayName || 'Новый судья',
