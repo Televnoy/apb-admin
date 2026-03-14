@@ -315,12 +315,17 @@
               setSelectedDay(lastDate.getDate());
             }
           }
+
           setData(evaluations);
-          requestAnimationFrame(() => {
-            if (mounted) {
-              setLoading(false);
-            }
-          });
+
+// Небольшая задержка перед скрытием прелоадера, чтобы React успел отрисовать
+setTimeout(() => {
+  if (mounted) {
+    setLoading(false);
+  }
+}, 100);
+          
+          
         }, (error) => {
           console.error("❌ Snapshot error:", error);
           if (mounted) {
