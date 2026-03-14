@@ -44,7 +44,7 @@ const updateJudgeDevice = async (judgeKey, deviceId) => {
 };
 
 const createJudgeKey = async (initialData = {}) => {
-  // Генерируем случайный ключ (можно использовать уникальный ID)
+  // Генерируем случайный ключ
   const newKey = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
   const docRef = doc(db, 'judges', newKey);
   await setDoc(docRef, {
