@@ -1,14 +1,12 @@
 import { db, messaging, saveFcmToken, removeFcmToken } from '/apb-admin/firebase-init.js';
 import { getToken } from 'firebase/messaging';
 
-// Компонент настроек (React)
 export function Settings({ show, onClose, adminDeviceId }) {
   const [pushEnabled, setPushEnabled] = React.useState(() => {
     const saved = localStorage.getItem('pushEnabled');
     return saved === null ? true : saved === 'true';
   });
 
-  // Управление токеном при изменении переключателя
   React.useEffect(() => {
     if (!adminDeviceId) return;
 
