@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="АПБ Админ Панель – управление чемпионатом" />
+  <link rel="manifest" href="/apb-admin/a-manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="/apb-admin/aapple-touch-icon.png" />
+  <title>АПБ Админ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600&display=swap" rel="stylesheet">
+  <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Import map for Firebase modules -->
+  <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
+        "firebase/messaging": "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js"
+      }
+    }
+  </script>
+  <!-- Наш модуль инициализации Firebase -->
+  <script type="module" src="/apb-admin/firebase-init.js"></script>
+  <style>
+    * {
+      font-family: 'Inter', sans-serif;
+    }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(-5px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .event-text {
+      animation: fadeIn 0.3s ease-out;
+    }
+    /* Стили для прелоадера */
+    .preloader-container {
+      text-align: center;
+      width: 100%;
+      max-width: 280px;
+    }
+    .preloader-text {
+      font-weight: 200;
+      font-size: 0.85rem;
+      letter-spacing: 0.15em;
+      color: #000;
+      margin-bottom: 24px;
+      text-transform: lowercase;
+      animation: blink 2s ease-in-out infinite;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .preloader-progress-container {
+      width: 100%;
+      height: 1px;
+      background-color: #f2f2f2;
+      margin-bottom: 12px;
+      position: relative;
+    }
+    .preloader-progress-bar {
+      height: 100%;
+      width: 0%;
+      background-color: #000;
+      transition: width 0.3s ease-out;
+    }
+    .preloader-percentage {
+      font-weight: 100;
+      font-size: 0.75rem;
+      color: #666;
+      letter-spacing: 0.1em;
+      margin-top: 8px;
+    }
+    .fade-in-ui {
+      animation: fadeInUI 1s ease-out forwards;
+    }
+    @keyframes fadeInUI {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    /* Стили для toggle */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #e5e7eb;
+      transition: .2s;
+      border-radius: 24px;
+    }
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .2s;
+      border-radius: 50%;
+    }
+    input:checked + .toggle-slider {
+      background-color: #000;
+    }
+    input:checked + .toggle-slider:before {
+      transform: translateX(20px);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-type="module">
+    import { db, messaging, saveFcmToken, removeFcmToken } from '/apb-admin/firebase-init.js';
+    import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+    import { getToken, onMessage } from 'firebase/messaging';
+
+    const MONTHS = [
+      "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+      "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ];
+
+    function App() {
+      const [data, setData] = React.useState([]);
+      const [loading, setLoading] = React.useState(true);
+      const [selectedCity, setSelectedCity] = React.useState('Все города');
+      const [selectedDate, setSelectedDate] = React.useState({
+        month: new Date().getMonth(),
+        year: new Date().getFullYear()
+      });
+      const [selectedDay, setSelectedDay] = React.useState(null);
+      const [currentEvent, setCurrentEvent] = React.useState(null);
+      const [lastEventText, setLastEventText] = React.useState('');
+      const [modalMedia, setModalMedia] = React.useState(null);
+      const [aiAnalysis, setAiAnalysis] = React.useState("");
+      const [isAnalyzing, setIsAnalyzing] = React.useState(false);
+      const [errorInfo, setErrorInfo] = React.useState(null);
+      const [fullscreenImage, setFullscreenImage] = React.useState(null);
+      const [deferredPrompt, setDeferredPrompt] = React.useState(null);
+      const [showCalendar, setShowCalendar] = React.useState(false);
+      const [showUpdateNotification, setShowUpdateNotification] = React.useState(false);
+      const [adminDeviceId, setAdminDeviceId] = React.useState('');
+      
+      // Состояние для окна настроек push
+      const [showPushSettings, setShowPushSettings] = React.useState(false);
+      // Состояние включения push-уведомлений (из localStorage)
+      const [pushEnabled, setPushEnabled] = React.useState(() => {
+        const saved = localStorage.getItem('pushEnabled');
+        return saved === null ? true : saved === 'true';
+      });
+
+      // Состояние для прогресса загрузки
+      const [progress, setProgress] = React.useState(0);
+
+      const scrollRef = React.useRef(null);
+      const calendarRef = React.useRef(null);
+      const eventTimeoutRef = React.useRef(null);
+      const tempEventTimeoutRef = React.useRef(null);
+
+      // --- ОЧИСТКА ТАЙМЕРОВ ---
+      React.useEffect(() => {
+        return () => {
+          if (eventTimeoutRef.current) clearTimeout(eventTimeoutRef.current);
+          if (tempEventTimeoutRef.current) clearTimeout(tempEventTimeoutRef.current);
+        };
+      }, []);
+
+      // --- ИМИТАЦИЯ ПРОГРЕССА ---
+      React.useEffect(() => {
+        if (!loading) return;
+        let interval = setInterval(() => {
+          setProgress(prev => {
+            const increment = Math.random() * 3;
+            const next = prev + increment;
+            if (next >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return next;
+          });
+        }, 50);
+        return () => clearInterval(interval);
+      }, [loading]);
+
+      // --- ПОКАЗ СОБЫТИЯ (showEvent) ---
+      const showEvent = (text, isTemporary = false) => {
+        if (isTemporary) {
+          if (!lastEventText) return;
+          if (tempEventTimeoutRef.current) clearTimeout(tempEventTimeoutRef.current);
+          setCurrentEvent({ id: Date.now(), text: lastEventText, isTemporary: true });
+          tempEventTimeoutRef.current = setTimeout(() => {
+            setCurrentEvent(prev => prev?.isTemporary ? null : prev);
+            tempEventTimeoutRef.current = null;
+          }, 1000);
+        } else {
+          if (eventTimeoutRef.current) clearTimeout(eventTimeoutRef.current);
+          setCurrentEvent({ id: Date.now(), text, isTemporary: false });
+          setLastEventText(text);
+          eventTimeoutRef.current = setTimeout(() => {
+            setCurrentEvent(prev => prev && !prev.isTemporary ? null : prev);
+            eventTimeoutRef.current = null;
+          }, 30000);
+        }
+      };
+
+      // --- ОБРАБОТЧИК КЛИКА ПО ДАШБОРДУ ---
+      const handleDashboardClick = () => {
+        if (currentEvent && !currentEvent.isTemporary) {
+          if (eventTimeoutRef.current) clearTimeout(eventTimeoutRef.current);
+          setCurrentEvent(prev => ({ ...prev, id: Date.now() }));
+          eventTimeoutRef.current = setTimeout(() => {
+            setCurrentEvent(null);
+            eventTimeoutRef.current = null;
+          }, 30000);
+        } else {
+          if (lastEventText) {
+            showEvent(lastEventText, true);
+          }
+        }
+      };
+
+      // --- beforeinstallprompt ---
+      React.useEffect(() => {
+        window.addEventListener('beforeinstallprompt', (e) => {
+          e.preventDefault();
+          setDeferredPrompt(e);
+        });
+      }, []);
+
+      // --- ЗАКРЫТИЕ КАЛЕНДАРЯ ПРИ КЛИКЕ ВНЕ ---
+      React.useEffect(() => {
+        const handleClickOutside = (event) => {
+          if (calendarRef.current && !calendarRef.current.contains(event.target)) {
+            setShowCalendar(false);
+          }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }, []);
+
+      const handleInstallClick = async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') setDeferredPrompt(null);
+      };
+
+      const handleUpdateClick = () => {
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({ action: 'skipWaiting' });
+        }
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload();
+        });
+        setShowUpdateNotification(false);
+      };
+
+      // --- РЕГИСТРАЦИЯ SERVICE WORKER ---
+      React.useEffect(() => {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('/apb-admin/a-sw.js')
+            .then((registration) => {
+              console.log('SW registered:', registration);
+              setInterval(() => {
+                registration.update();
+              }, 60 * 60 * 1000);
+              registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                console.log('New service worker found');
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    setShowUpdateNotification(true);
+                  }
+                });
+              });
+            })
+            .catch(err => console.log('SW registration failed:', err));
+        }
+      }, []);
+
+      // --- ГЕНЕРАЦИЯ ID УСТРОЙСТВА ---
+      React.useEffect(() => {
+        let deviceId = localStorage.getItem('admin_device_id');
+        if (!deviceId) {
+          deviceId = 'admin_' + Math.random().toString(36).substr(2, 12) + Date.now();
+          localStorage.setItem('admin_device_id', deviceId);
+        }
+        setAdminDeviceId(deviceId);
+      }, []);
+
+      // --- УПРАВЛЕНИЕ PUSH-УВЕДОМЛЕНИЯМИ (включение/отключение) ---
+      React.useEffect(() => {
+        if (!adminDeviceId) return;
+
+        const handlePushToggle = async () => {
+          if (pushEnabled) {
+            // Включить уведомления
+            try {
+              const registration = await navigator.serviceWorker.ready;
+              if (Notification.permission !== 'granted') {
+                await Notification.requestPermission();
+              }
+              if (Notification.permission === 'granted') {
+                const vapidKey = 'BHZoy1QJ4PkloCIRFeKQ2UwYr44eziDY8C8wXqL4bSG6mbRGxQ03-v6vGJCmITc3jPWKfcq3Au3gVT860yIwNLg';
+                const token = await getToken(messaging, {
+                  vapidKey,
+                  serviceWorkerRegistration: registration
+                });
+                if (token) {
+                  await saveFcmToken(adminDeviceId, token, navigator.userAgent);
+                  console.log('Admin FCM token saved');
+                }
+              }
+            } catch (err) {
+              console.error('FCM setup error:', err);
+            }
+          } else {
+            // Выключить уведомления – удалить токен из Firestore
+            try {
+              await removeFcmToken(adminDeviceId);
+              console.log('Admin FCM token removed');
+            } catch (err) {
+              console.error('Error removing token:', err);
+            }
+          }
+        };
+
+        handlePushToggle();
+      }, [adminDeviceId, pushEnabled]);
+
+      // --- ОБРАБОТКА ВХОДЯЩИХ PUSH-СООБЩЕНИЙ (foreground) ---
+      React.useEffect(() => {
+        const unsubscribe = onMessage(messaging, (payload) => {
+          console.log('Message received in foreground:', payload);
+          let text = '';
+          if (payload.notification) {
+            text = payload.notification.body;
+          } else if (payload.data) {
+            const { judgeName, participantNumbers, discipline } = payload.data;
+            if (judgeName && participantNumbers) {
+              text = `${judgeName} оценил участника №${participantNumbers} в номинации ${discipline}`;
+            }
+          }
+          if (text) {
+            showEvent(text);
+          }
+        });
+        return () => unsubscribe();
+      }, []);
+
+      // --- ПОДПИСКА НА КОЛЛЕКЦИЮ EVALUATIONS (исправленная) ---
+      React.useEffect(() => {
+        let mounted = true;
+
+        const evaluationsQuery = query(
+          collection(db, 'evaluations'),
+          orderBy('createdAt', 'desc'),
+          limit(100)
+        );
+
+        const unsubscribe = onSnapshot(evaluationsQuery, (snapshot) => {
+          if (!mounted) return;
+
+          const evaluations = snapshot.docs.map(doc => ({
+            firestoreId: doc.id,
+            ...doc.data()
+          }));
+          console.log('🔥 Получены оценки:', evaluations.length);
+
+          if (data.length === 0 && evaluations.length > 0) {
+            const latest = evaluations[0];
+            const judge = latest.judgeName || 'Судья';
+            const participantNumbers = latest.participants?.map(p => p.number).join(', ') || '—';
+            const text = `${judge} оценил участника №${participantNumbers} в номинации ${latest.discipline || '—'}`;
+            showEvent(text);
+          } else if (data.length > 0) {
+            const newEvals = evaluations.filter(newItem =>
+              !data.some(oldItem => oldItem.firestoreId === newItem.firestoreId)
+            );
+            newEvals.forEach(item => {
+              const judge = item.judgeName || 'Судья';
+              const participantNumbers = item.participants?.map(p => p.number).join(', ') || '—';
+              const text = `${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`;
+              showEvent(text);
+            });
+          }
+
+          if (evaluations.length > 0) {
+            const latest = evaluations[0];
+            if (latest.createdAt) {
+              const lastDate = latest.createdAt.toDate();
+              setSelectedDate({ month: lastDate.getMonth(), year: lastDate.getFullYear() });
+              setSelectedDay(lastDate.getDate());
+            }
+          }
+
+          setData(evaluations);
+
+          requestAnimationFrame(() => {
+            if (mounted) {
+              setLoading(false);
+            }
+          });
+        }, (error) => {
+          console.error("❌ Snapshot error:", error);
+          if (mounted) {
+            setLoading(false);
+          }
+        });
+
+        return () => {
+          mounted = false;
+          unsubscribe();
+        };
+      }, []);
+
+      // --- ПРОКРУТКА ВНИЗ ПРИ ОБНОВЛЕНИИ ДАННЫХ ---
+      React.useEffect(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      }, [data, selectedCity, selectedDate, selectedDay]);
+
+      // --- ОБНОВЛЕНИЕ ИКОНОК LUCIDE ---
+      React.useEffect(() => {
+        if (window.lucide) {
+          lucide.createIcons();
+        }
+      });
+
+      // ========== ВСЕ ВАШИ ФУНКЦИИ (фильтрация, агрегация, анализ) ==========
+
+      // Фильтрация по дате
+      const getFilteredByDate = () => {
+        return data.filter(item => {
+          if (!item.createdAt) return false;
+          const date = item.createdAt.toDate();
+          if (date.getMonth() !== selectedDate.month || date.getFullYear() !== selectedDate.year) return false;
+          if (selectedDay !== null && date.getDate() !== selectedDay) return false;
+          return true;
+        });
+      };
+
+      // Плоский список для потока (новые снизу)
+      const getFlatList = () => {
+        const list = [];
+        const filteredData = getFilteredByDate();
+        
+        filteredData.forEach(item => {
+          if (item.participants && Array.isArray(item.participants)) {
+            item.participants.forEach((p, pIdx) => {
+              list.push({
+                firestoreId: item.firestoreId,
+                participantIdx: pIdx,
+                number: p.number || '00',
+                score: Number(p.score) || 0,
+                judge: item.judgeName || '—',
+                city: item.city || '—',
+                comment: p.comment || '',
+                photos: p.photos || [],
+                discipline: item.discipline || '—',
+                createdAt: item.createdAt
+              });
+            });
+          }
+        });
+        // Сортируем по времени создания (от старых к новым)
+        list.sort((a, b) => {
+          const timeA = a.createdAt ? a.createdAt.toDate().getTime() : 0;
+          const timeB = b.createdAt ? b.createdAt.toDate().getTime() : 0;
+          return timeA - timeB;
+        });
+        return list;
+      };
+
+      // Агрегированные данные для итогов
+      const getAggregatedRanked = () => {
+        const filteredData = getFilteredByDate();
+        const groups = {};
+
+        filteredData.forEach(item => {
+          if (item.participants && Array.isArray(item.participants)) {
+            item.participants.forEach(p => {
+              const date = item.createdAt ? item.createdAt.toDate() : new Date();
+              const key = `${p.number}|${item.discipline}|${item.city}|${date.toDateString()}`;
+              if (!groups[key]) {
+                groups[key] = {
+                  number: p.number,
+                  discipline: item.discipline,
+                  city: item.city,
+                  date: date,
+                  scores: [],
+                  comments: [],
+                  photos: [],
+                  judges: [],
+                  firestoreIds: []
+                };
+              }
+              groups[key].scores.push(Number(p.score) || 0);
+              if (p.comment) groups[key].comments.push({ judge: item.judgeName, text: p.comment });
+              if (p.photos) groups[key].photos.push(...p.photos);
+              if (item.judgeName) groups[key].judges.push(item.judgeName);
+              groups[key].firestoreIds.push(item.firestoreId);
+            });
+          }
+        });
+
+        const aggregated = Object.values(groups).map(g => ({
+          ...g,
+          avgScore: g.scores.reduce((a, b) => a + b, 0) / g.scores.length,
+          allComments: g.comments,
+          allPhotos: [...new Set(g.photos)]
+        }));
+
+        return aggregated.sort((a, b) => b.avgScore - a.avgScore);
+      };
+
+      // --- Переменные для отображения ---
+      const allEntriesRaw = getFlatList(); // новые внизу
+      const aggregatedRanked = getAggregatedRanked();
+      const cities = ['Все города', ...new Set(allEntriesRaw.map(e => e.city))];
+      
+      const filteredLiveEntries = selectedCity === 'Все города' 
+        ? allEntriesRaw 
+        : allEntriesRaw.filter(e => e.city === selectedCity);
+
+      const getNominationGroups = () => {
+        const filteredAggregated = selectedCity === 'Все города' 
+          ? aggregatedRanked 
+          : aggregatedRanked.filter(g => g.city === selectedCity);
+        const groups = {};
+        filteredAggregated.forEach(g => {
+          if (!groups[g.discipline]) groups[g.discipline] = [];
+          groups[g.discipline].push(g);
+        });
+        Object.keys(groups).forEach(key => {
+          groups[key].sort((a, b) => b.avgScore - a.avgScore);
+        });
+        return groups;
+      };
+
+      const getDaysWithData = () => {
+        const days = new Set();
+        data.forEach(item => {
+          if (!item.createdAt) return;
+          const date = item.createdAt.toDate();
+          if (date.getMonth() === selectedDate.month && date.getFullYear() === selectedDate.year) {
+            days.add(date.getDate());
+          }
+        });
+        return Array.from(days).sort((a, b) => a - b);
+      };
+
+      // --- Анализ комментариев через YandexGPT ---
+      const analyzeComments = async (target, mode) => {
+        setIsAnalyzing(true);
+        setAiAnalysis("");
+        setErrorInfo(null);
+
+        let commentsText = '';
+        if (mode === 'single') {
+          const { firestoreId, participantIdx } = target;
+          const record = allEntriesRaw.find(e => e.firestoreId === firestoreId && e.participantIdx === participantIdx);
+          if (record && record.comment.trim()) {
+            commentsText = `Судья ${record.judge}: "${record.comment}"`;
+          }
+        } else {
+          const { number, discipline, city, date } = target;
+          const targetDate = new Date(date).toDateString();
+          const comments = allEntriesRaw
+            .filter(e => 
+              e.number === number && 
+              e.discipline === discipline && 
+              e.city === city &&
+              new Date(e.createdAt.toDate()).toDateString() === targetDate &&
+              e.comment.trim().length > 0
+            )
+            .map(e => `Судья ${e.judge}: "${e.comment}"`)
+            .join("\n");
+          commentsText = comments;
+        }
+
+        if (!commentsText) {
+          setAiAnalysis("Недостаточно отзывов для анализа.");
+          setIsAnalyzing(false);
+          return;
+        }
+
+        try {
+          const PROXY_URL = "https://functions.yandexcloud.net/d4ej8k6scmj9evo4us4n";
+          const response = await fetch(PROXY_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              completionOptions: { stream: false, temperature: 0.6, maxTokens: "2000" },
+              messages: [
+                { role: "system", text: "Ты эксперт-аналитик конкурса по брейдингу (плетение кос, дреды, брейды, изготовление комплектов для вплета). Пиши профессионально и вежливо, давай краткие резюме (2-3 предложения)." },
+                { role: "user", text: `Проанализируй отзывы судей:\n\n${commentsText}` }
+              ]
+            })
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error ${response.status}: ${errorText}`);
+          }
+
+          const result = await response.json();
+          const generatedText = result.result?.alternatives?.[0]?.message?.text || "Анализ не удался.";
+          setAiAnalysis(generatedText);
+        } catch (error) {
+          console.error("YandexGPT proxy error:", error);
+          setErrorInfo("Ошибка при запросе к YandexGPT.");
+        } finally {
+          setIsAnalyzing(false);
+        }
+      };
+
+      const openFromStream = (item) => {
+        setModalMedia({
+          type: 'single',
+          firestoreId: item.firestoreId,
+          participantIdx: item.participantIdx,
+          number: item.number,
+          discipline: item.discipline,
+          city: item.city,
+          timestamp: item.createdAt.toDate().toISOString(),
+          photos: item.photos,
+          judge: item.judge,
+          comment: item.comment
+        });
+        analyzeComments(item, 'single');
+      };
+
+      const openFromAggregated = (group) => {
+        setModalMedia({
+          type: 'group',
+          number: group.number,
+          discipline: group.discipline,
+          city: group.city,
+          timestamp: group.date,
+          photos: group.allPhotos,
+          comments: group.allComments
+        });
+        analyzeComments(group, 'group');
+      };
+
+      const copyReportToClipboard = () => {
+        if (!modalMedia) return;
+        let commentsList = '';
+        if (modalMedia.type === 'single') {
+          commentsList = `• ${modalMedia.judge}: "${modalMedia.comment}"`;
+        } else {
+          commentsList = modalMedia.comments.map(c => `• ${c.judge}: "${c.text}"`).join("\n");
+        }
+        const reportText = `Участник №${modalMedia.number}\nНоминация: ${modalMedia.discipline}\nГород чемпионата: ${modalMedia.city}\nДата: ${new Date(modalMedia.timestamp).toLocaleDateString()}\n\nAI Анализ:\n${aiAnalysis || "Анализ не выполнялся"}\n\nКомментарии судей:\n${commentsList || "Нет комментариев."}`;
+        navigator.clipboard.writeText(reportText).then(() => {
+          alert("Отчёт скопирован в буфер обмена");
+        }).catch(() => {
+          alert("Не удалось скопировать");
+        });
+      };
+
+      const changeMonth = (direction) => {
+        setSelectedDate(prev => {
+          let newMonth = prev.month + direction;
+          let newYear = prev.year;
+          if (newMonth > 11) { newMonth = 0; newYear++; }
+          if (newMonth < 0) { newMonth = 11; newYear--; }
+          return { month: newMonth, year: newYear };
+        });
+        setSelectedDay(null);
+      };
+
+      const daysWithData = getDaysWithData();
+      const dateDisplay = selectedDay 
+        ? `${selectedDay} ${MONTHS[selectedDate.month]} ${selectedDate.year}`
+        : `${MONTHS[selectedDate.month]} ${selectedDate.year}`;
+
+      if (loading) return (
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <div className="preloader-container fade-in-ui">
+            <div className="preloader-text">загрузка данных...</div>
+            <div className="preloader-progress-container">
+              <div className="preloader-progress-bar" style={{ width: progress + '%' }}></div>
+            </div>
+            <div className="preloader-percentage">{Math.floor(progress)}%</div>
+          </div>
+        </div>
+      );
+
+      return (
+        <div className="min-h-screen bg-gray-50 font-sans text-gray-900 select-none pb-12">
+          
+          {/* Баннер установки приложения */}
+          {deferredPrompt && (
+            <div className="bg-black text-white px-4 py-2 flex justify-between items-center text-[10px] sticky top-0 z-[60]">
+              <span>УСТАНОВИТЕ ПРИЛОЖЕНИЕ НА ГЛАВНЫЙ ЭКРАН</span>
+              <button onClick={handleInstallClick} className="bg-white text-black px-3 py-1 rounded-full text-[9px]">ДОБАВИТЬ</button>
+            </div>
+          )}
+
+          {/* Уведомление об обновлении PWA */}
+          {showUpdateNotification && (
+            <div className="bg-black text-white px-4 py-2 flex justify-between items-center text-[10px] sticky top-0 z-[60]" style={{ top: deferredPrompt ? '36px' : '0' }}>
+              <span>ДОСТУПНА НОВАЯ ВЕРСИЯ ПРИЛОЖЕНИЯ</span>
+              <button onClick={handleUpdateClick} className="bg-white text-black px-3 py-1 rounded-full text-[9px]">ОБНОВИТЬ</button>
+            </div>
+          )}
+
+          {/* КРУГЛЫЙ ДАШБОРД С КОЛОКОЛЬЧИКОМ И КНОПКА ШЕСТЕРЁНКИ */}
+          <div className="sticky top-2 z-40 w-full pt-2 pb-4 px-3">
+            <div className="max-w-5xl mx-auto flex items-center justify-between">
+              <div className="w-8"></div> {/* пустой отступ слева для симметрии */}
+              <div
+                onClick={handleDashboardClick}
+                className="bg-black text-white rounded-full flex items-center overflow-hidden transition-all duration-300 ease-in-out cursor-pointer"
+                style={{ maxWidth: currentEvent ? '500px' : '40px' }}
+              >
+                <div className="p-2 flex-shrink-0">
+                  <i data-lucide="bell" width="16" height="16" className="text-gray-400"></i>
+                </div>
+                {currentEvent && (
+                  <div className="whitespace-nowrap overflow-hidden text-ellipsis mr-3 text-[11px] font-medium event-text">
+                    {currentEvent.text}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setShowPushSettings(true)}
+                className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center"
+              >
+                <i data-lucide="settings" width="16" height="16" />
+              </button>
+            </div>
+          </div>
+
+          {/* ОКНО НАСТРОЕК PUSH-УВЕДОМЛЕНИЙ */}
+          {showPushSettings && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setShowPushSettings(false)}>
+              <div className="bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl space-y-6 border border-gray-100" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-light tracking-tight">Настройки</h2>
+                  <button onClick={() => setShowPushSettings(false)} className="text-gray-400">
+                    <i data-lucide="x" width="24" height="24"></i>
+                  </button>
+                </div>
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] font-medium uppercase tracking-widest">Push-уведомления</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={pushEnabled}
+                        onChange={(e) => {
+                          const newValue = e.target.checked;
+                          setPushEnabled(newValue);
+                          localStorage.setItem('pushEnabled', newValue);
+                        }}
+                      />
+                      <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-black transition"></div>
+                      <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5"></div>
+                    </label>
+                  </div>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wider">
+                    Включите, чтобы получать уведомления о новых оценках даже когда приложение закрыто.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {toast && (
+            <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[250] bg-black text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+              <i data-lucide="info" size={18} className="text-yellow-400"></i>
+              <span className="text-[11px] font-medium uppercase tracking-wider">{toast}</span>
+            </div>
+          )}
+          
+          <nav className="sticky top-0 z-[60] glass border-b border-gray-100 h-16">
+            <div className="max-w-md mx-auto px-6 h-full flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-[8px] font-medium text-gray-400 uppercase tracking-widest">Судья/Город</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[13px] font-medium uppercase tracking-tight">{judgeName}</span>
+                  <span className="text-gray-300 font-thin">•</span>
+                  <span className="text-[13px] font-light text-gray-400 uppercase">{eventCity}</span>
+                </div>
+              </div>
+              <div className="relative">
+                <button onClick={() => setIsDisciplineOpen(!isDisciplineOpen)} className="flex flex-col items-end">
+                  <span className="text-[8px] font-medium text-gray-400 uppercase tracking-widest">Наминация</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[13px] font-medium uppercase">{discipline}</span>
+                    <i data-lucide="expand_more" className={`text-gray-400 transition-transform ${isDisciplineOpen ? 'rotate-180' : ''}`} size={16}></i>
+                  </div>
+                </button>
+                {isDisciplineOpen && (
+                  <div className="absolute top-full right-0 mt-2 bg-white border border-gray-100 shadow-2xl rounded-xl py-1 w-56 z-50 max-h-64 overflow-y-auto no-scrollbar">
+                    {disciplines.map(d => (
+                      <button key={d} onClick={() => { setDiscipline(d); setIsDisciplineOpen(false); }} className="w-full px-5 py-3 text-left hover:bg-gray-50 text-[12px] font-light flex justify-between items-center">
+                        {d} {submittedDisciplines.includes(d) && <i data-lucide="check_circle" className="text-green-500" size={14}></i>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </nav>
+
+          <main className="max-w-md mx-auto px-6 pt-6 space-y-6">
+            {isCurrentSubmitted && (
+              <div className="bg-green-50 border border-green-100 rounded-xl p-3 flex items-center gap-3 text-green-700">
+                <i data-lucide="check_circle" size={18}></i>
+                <span className="text-[10px] font-medium uppercase tracking-wider">Отчет отправлен и заблокирован</span>
+              </div>
+            )}
+            
+            {participants.map((participant, index) => {
+              const isNumOpen = openSelect.id === participant.id && openSelect.type === 'number';
+              const isScoreOpen = openSelect.id === participant.id && openSelect.type === 'score';
+              return (
+                <div key={participant.id} className={`card-animate space-y-2 transition-opacity ${isCurrentSubmitted ? 'opacity-70' : ''}`}>
+                  <div className="flex items-center justify-between px-1">
+                    <span className="text-[9px] font-medium text-gray-400 uppercase tracking-widest">Участник {String(index + 1).padStart(2, '0')}</span>
+                    {!isCurrentSubmitted && participants.length > 1 && (
+                      <button onClick={() => setParticipants(participants.filter(p => p.id !== participant.id))} className="text-gray-300 hover:text-red-500 transition-colors"><i data-lucide="delete" size={16}></i></button>
+                    )}
+                  </div>
+                  
+                  <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-5">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="relative">
+                        <label className="text-[8px] font-medium text-gray-400 uppercase tracking-[0.2em] mb-1.5 block">ID Номер</label>
+                        <button disabled={isCurrentSubmitted} onClick={() => setOpenSelect({ id: participant.id, type: isNumOpen ? null : 'number' })} className="w-full flex items-center justify-between border-b border-gray-50 pb-2 text-xl font-light outline-none">
+                          {participant.number} {!isCurrentSubmitted && <i data-lucide="expand_more" className="text-gray-200" size={18}></i>}
+                        </button>
+                        {isNumOpen && (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-100 z-[80] h-44 overflow-y-auto no-scrollbar shadow-xl rounded-xl">
+                            {participantNumbers.map(n => {
+                              const isOcc = allOccupiedNumbers.includes(n) && n !== participant.number && n !== '00';
+                              return <div key={n} onClick={() => !isOcc && updateParticipant(participant.id, 'number', n)} className={`py-3 px-4 font-light border-b border-gray-50 text-sm ${isOcc ? 'text-red-200 bg-red-50/20' : 'hover:bg-gray-50'}`}>{n} {isOcc && '✖'}</div>
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <label className="text-[8px] font-medium text-gray-400 uppercase tracking-[0.2em] mb-1.5 block">Баллы</label>
+                        <button disabled={isCurrentSubmitted} onClick={() => setOpenSelect({ id: participant.id, type: isScoreOpen ? null : 'score' })} className={`w-full flex items-center justify-between border-b pb-2 text-xl font-light outline-none ${participant.score !== null ? 'border-black text-black' : 'border-gray-50 text-gray-200'}`}>
+                          {participant.score !== null ? participant.score : '--'} {!isCurrentSubmitted && <i data-lucide="expand_more" className="opacity-20" size={18}></i>}
+                        </button>
+                        {isScoreOpen && (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-100 z-[80] h-44 overflow-y-auto no-scrollbar shadow-xl rounded-xl">
+                            <div onClick={() => updateParticipant(participant.id, 'score', null)} className="py-3 px-4 text-[9px] text-gray-400 font-medium border-b border-gray-50 uppercase tracking-widest cursor-pointer">Сброс</div>
+                            {availableScores.map(s => {
+                              const isOcc = occupiedScores.includes(s) && s !== participant.score;
+                              return <div key={s} onClick={() => !isOcc && updateParticipant(participant.id, 'score', s)} className={`py-3 px-4 font-light border-b border-gray-50 text-sm ${isOcc ? 'text-red-200 bg-red-50/20' : 'hover:bg-gray-50'}`}>{s} {isOcc && '✖'}</div>
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[8px] font-medium text-gray-400 uppercase tracking-[0.2em] block">Комментарий</label>
+                      <div onClick={() => !isCurrentSubmitted && setFullscreenNote({ id: participant.id, text: participant.comment })} className="min-h-[36px] text-[13px] text-gray-500 font-light leading-snug border-b border-gray-50 pb-2 cursor-pointer transition-colors">
+                        {participant.comment || "Нажмите для ввода заметки..."}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-6 pt-1">
+                      <button onClick={() => startCamera(participant.id)} disabled={isCurrentSubmitted} className="flex items-center gap-2 text-gray-600 text-[10px] font-medium uppercase tracking-widest disabled:opacity-20">
+                        <i data-lucide="photo_camera" size={18}></i> Фото
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                          if (!SpeechRecognition) return showToast('Голосовой ввод не поддерживается');
+                          const r = new SpeechRecognition();
+                          r.lang = 'ru-RU';
+                          r.onstart = () => setIsRecording(participant.id);
+                          r.onend = () => setIsRecording(null);
+                          r.onresult = (e) => updateParticipant(participant.id, 'comment', (participant.comment ? participant.comment + ' ' : '') + e.results[0][0].transcript);
+                          r.start();
+                        }} 
+                        disabled={isCurrentSubmitted} 
+                        className={`flex items-center gap-2 text-[10px] font-medium uppercase tracking-widest transition-colors disabled:opacity-20 ${isRecording === participant.id ? 'text-red-600 animate-pulse' : 'text-gray-600'}`}
+                      >
+                        <i data-lucide="mic" size={18}></i> Голос
+                      </button>
+                      <label className="flex items-center gap-2 text-gray-600 text-[10px] font-medium uppercase tracking-widest cursor-pointer disabled:opacity-20">
+                        <i data-lucide="attach_file" size={18}></i> Файл
+                        <input type="file" multiple accept="image/*" className="hidden" disabled={isCurrentSubmitted} onChange={async (e) => {
+                          const files = Array.from(e.target.files);
+                          const processedPhotos = [];
+                          for (const f of files) {
+                            const reader = new FileReader();
+                            const base64 = await new Promise((resolve) => {
+                              reader.onload = (re) => resolve(re.target.result);
+                              reader.readAsDataURL(f);
+                            });
+                            const processed = await resizeAndCropImage(base64, 800, 1422);
+                            processedPhotos.push(processed);
+                          }
+                          setParticipants(prev => prev.map(p => 
+                            p.id === participant.id 
+                              ? { ...p, photos: [...p.photos, ...processedPhotos] } 
+                              : p
+                          ));
+                        }} />
+                      </label>
+                    </div>
+
+                    {participant.photos.length > 0 && (
+                      <div className="flex gap-2 overflow-x-auto no-scrollbar pt-1">
+                        {participant.photos.map((p, i) => (
+                          <div 
+                            key={i} 
+                            className="photo-item flex-shrink-0 relative"
+                            onTouchStart={() => handlePhotoTouchStart(participant.id, i)}
+                            onTouchEnd={handlePhotoTouchEnd}
+                            onTouchCancel={handlePhotoTouchCancel}
+                          >
+                            <img src={p} className="w-12 h-12 rounded-lg object-cover border border-gray-50" alt="" />
+                            {longPress.participantId === participant.id && longPress.photoIndex === i && (
+                              <div 
+                                className="delete-overlay"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deletePhoto(participant.id, i);
+                                }}
+                              >
+                                <i data-lucide="close" size={16}></i>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </main>
+
+          <footer className="fixed bottom-0 left-0 right-0 glass border-t border-gray-100 px-6 py-4 pb-8 z-40">
+            <div className="max-w-md mx-auto">
+              <div className="flex gap-1.5 mb-4 overflow-x-auto no-scrollbar py-1 pl-2">
+                {availableScores.map(s => {
+                  const used = occupiedScores.includes(s);
+                  return (
+                    <div key={s} className={`flex-shrink-0 w-6 h-6 flex items-center justify-center text-[9px] rounded-full border transition-all duration-300 ${used ? 'bg-[#3171af] border-[#3171af] text-white scale-[1.1]' : 'bg-transparent border-gray-200 text-gray-300'}`}>
+                      <span>{s}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <div className="flex gap-3">
+                <button disabled={isCurrentSubmitted} onClick={() => setParticipants([...participants, { id: Date.now().toString(), number: '00', comment: '', photos: [], score: null }])} className={`w-11 h-11 rounded-full border border-gray-100 flex items-center justify-center active:scale-90 transition-all shadow-sm ${isCurrentSubmitted ? 'opacity-10' : 'bg-white'}`}>
+                  <i data-lucide="add" size={24}></i>
+                </button>
+                <button onClick={handleSendReport} disabled={!isReadyToSave || isCurrentSubmitted} className={`flex-1 h-11 rounded-full flex items-center justify-center gap-3 font-medium text-[10px] uppercase tracking-[0.2em] transition-all ${isReadyToSave && !isCurrentSubmitted ? 'bg-[#3171af] text-white shadow-lg active:scale-95' : 'bg-gray-100 text-gray-300 pointer-events-none'}`}>
+                  <i data-lucide="send" size={16}></i> {isCurrentSubmitted ? 'Отправлено' : 'Отправить отчет'}
+                </button>
+                <button onClick={() => setIsSettingsOpen(true)} className="w-11 h-11 rounded-full border border-gray-100 bg-white flex items-center justify-center active:scale-90 transition-all shadow-sm">
+                  <i data-lucide="settings" size={24} className="text-gray-600"></i>
+                </button>
+              </div>
+            </div>
+          </footer>
+
+          {isSettingsOpen && (
+            <div className="fixed inset-0 bg-white/60 backdrop-blur-xl z-[150] flex flex-col items-center justify-center p-8">
+              <div className="w-full max-w-sm bg-white rounded-[32px] p-8 shadow-2xl space-y-8 border border-gray-100 card-animate">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-light tracking-tight">Настройки</h2>
+                  <button onClick={() => setIsSettingsOpen(false)} className="text-gray-400"><i data-lucide="close" size="24"></i></button>
+                </div>
+                <div className="space-y-6">
+                  <div className="space-y-1.5">
+                    <label className="text-[8px] font-medium text-gray-400 uppercase tracking-widest block">Логин (Имя)</label>
+                    <input type="text" value={editJudgeName} onChange={(e) => setEditJudgeName(e.target.value)} className="w-full bg-gray-50 border-none rounded-2xl py-4 px-5 text-sm outline-none focus:ring-1 focus:ring-black transition-all" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[8px] font-medium text-gray-400 uppercase tracking-widest block">Пароль (Ключ)</label>
+                    <input type="text" value={editAccessKey} onChange={(e) => setEditAccessKey(e.target.value)} className="w-full bg-gray-50 border-none rounded-2xl py-4 px-5 text-sm outline-none focus:ring-1 focus:ring-black transition-all" />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <button onClick={handleSaveSettings} className="w-full bg-[#3171af] text-white rounded-full py-4 text-[11px] font-medium uppercase tracking-widest active:scale-95 transition-all">Сохранить</button>
+                  <button onClick={() => setIsHistoryOpen(true)} className="w-full bg-gray-50 text-gray-600 rounded-full py-4 text-[11px] font-medium uppercase tracking-widest active:scale-95 transition-all">История оценок</button>
+                  <button onClick={async () => {
+                    try {
+                      const result = await window.api.unbindDevice(accessKey, window.deviceId);
+                      if (!result.success) {
+                        console.warn('Не удалось отвязать устройство:', result.error);
+                      }
+                    } catch (e) {
+                      console.error('Ошибка при отвязке устройства:', e);
+                    } finally {
+                      localStorage.clear();
+                      window.location.reload();
+                    }
+                  }} className="w-full bg-red-50 text-red-500 rounded-full py-4 text-[11px] font-medium uppercase tracking-widest active:scale-95 transition-all">Выйти</button>                                
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isHistoryOpen && (
+            <div className="fixed inset-0 bg-white z-[160] flex flex-col p-8">
+              <div className="flex justify-between items-center mb-8">
+                <button onClick={() => setIsHistoryOpen(false)} className="flex items-center gap-2 text-gray-400 text-[11px] font-medium uppercase tracking-widest">
+                  <i data-lucide="arrow_back" size={18}></i> Назад
+                </button>
+                <span className="text-[9px] font-medium text-gray-300 uppercase tracking-[0.3em]">История</span>
+              </div>
+              <div className="flex-1 overflow-y-auto no-scrollbar rounded-2xl border border-gray-100">
+                {history.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-gray-300 space-y-4">
+                    <i data-lucide="history" size={48} className="opacity-20"></i>
+                    <p className="text-[10px] uppercase tracking-widest">История пуста</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-gray-50 border-b border-gray-100">
+                      <tr>
+                        <th className="px-4 py-3 text-[9px] font-semibold text-gray-400 uppercase tracking-wider">ID</th>
+                        <th className="px-4 py-3 text-[9px] font-semibold text-gray-400 uppercase tracking-wider text-right">Балл</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {history.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="px-4 py-4">
+                            <div className="text-[13px] font-medium">#{item.participantId}</div>
+                            <div className="text-[8px] text-gray-400 uppercase">{item.discipline}</div>
+                          </td>
+                          <td className="px-4 py-4 text-right">
+                            <span className="bg-black text-white text-[10px] px-2 py-0.5 rounded font-medium">{item.score}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+
+          {fullscreenNote && (
+            <div className="fixed inset-0 bg-white z-[200] flex flex-col p-8 animate-in fade-in slide-in-from-bottom-5 duration-300">
+              <div className="flex justify-between items-center mb-10">
+                <span className="text-[9px] font-medium text-gray-400 uppercase tracking-[0.3em]">Заметка</span>
+                <button onClick={() => { updateParticipant(fullscreenNote.id, 'comment', fullscreenNote.text); setFullscreenNote(null); }} className="text-black font-medium text-[13px] uppercase tracking-wider border-b border-black">Готово</button>
+              </div>
+              <textarea autoFocus value={fullscreenNote.text} onChange={(e) => setFullscreenNote({...fullscreenNote, text: e.target.value})} className="flex-1 text-2xl font-light outline-none bg-transparent resize-none leading-relaxed" placeholder="Опишите нюансы..." />
+            </div>
+          )}
+
+          {activeCamera && (
+            <div className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center">
+              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+              <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center bg-gradient-to-b from-black/60 to-transparent">
+                <button onClick={stopCamera} className="text-white bg-white/10 backdrop-blur-md p-3 rounded-full border border-white/10">
+                  <i data-lucide="close" size={28}></i>
+                </button>
+                <button onClick={toggleFacingMode} className="text-white bg-white/10 backdrop-blur-md p-3 rounded-full border border-white/10">
+                  <i data-lucide="flip_camera_ios" size={28}></i>
+                </button>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 p-10 pb-20 flex justify-center items-center bg-gradient-to-t from-black/60 to-transparent">
+                <button onClick={takePhoto} className="w-20 h-20 bg-[#3171af] rounded-full border-[6px] border-white/20 flex items-center justify-center active:scale-90 transition-transform">
+                  <div className="w-14 h-14 bg-white rounded-full border-2 border-black/5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
