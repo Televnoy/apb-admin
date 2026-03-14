@@ -14,7 +14,8 @@ export function Settings({ show, onClose, adminDeviceId }) {
 
   React.useEffect(() => {
     if (show) {
-      loadJudges();
+      console.time('loadJudges');
+      loadJudges().finally(() => console.timeEnd('loadJudges'));
     }
   }, [show]);
 
