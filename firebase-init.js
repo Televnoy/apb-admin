@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, deleteDoc, serverTimestamp, collection, getDocs, updateDoc } from 'firebase/firestore';
 import { getMessaging } from 'firebase/messaging';
 
 const firebaseConfig = {
@@ -16,6 +16,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const messaging = getMessaging(app);
 
+// ----- FCM токены -----
 const saveFcmToken = async (deviceId, token, userAgent) => {
   await setDoc(doc(db, 'adminFcmTokens', deviceId), {
     fcmToken: token,
@@ -28,4 +29,44 @@ const removeFcmToken = async (deviceId) => {
   await deleteDoc(doc(db, 'adminFcmTokens', deviceId));
 };
 
-export { db, messaging, saveFcmToken, removeFcmToken };
+// ----- Работа с ключами судей (коллекция judges) -----
+const getJudges = async () => {
+  const snapshot = await getDocs(collection(db, 'judges'));
+  return snapshot.docs.map(doc => ({ key: doc.id, ...doc.data() }));
+};
+
+const updateJudgeDevice = async (judgeKey, deviceId) => {
+  const docRef = doc(db, 'judges', judgeKey);
+  await updateDoc(docRef, { 
+    deviceId: deviceId || null,
+    unboundAt: deviceId ? null : serverTimestamp()
+  });
+};
+
+const createJudgeKey = async (initialData = {}) => {
+  // Генерируем случайный ключ (можно использовать уникальный ID)
+  const newKey = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+  const docRef = doc(db, 'judges', newKey);
+  await setDoc(docRef, {
+    displayName: initialData.displayName || 'Новый судья',
+    city: initialData.city || 'Не указан',
+    deviceId: null,
+    createdAt: serverTimestamp()
+  });
+  return newKey;
+};
+
+const deleteJudgeKey = async (judgeKey) => {
+  await deleteDoc(doc(db, 'judges', judgeKey));
+};
+
+export { 
+  db, 
+  messaging, 
+  saveFcmToken, 
+  removeFcmToken,
+  getJudges,
+  updateJudgeDevice,
+  createJudgeKey,
+  deleteJudgeKey
+};
