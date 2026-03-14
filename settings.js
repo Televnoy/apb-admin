@@ -1,4 +1,4 @@
-import { saveFcmToken, removeFcmToken } from '/apb-admin/firebase-init.js';
+import { db, messaging, saveFcmToken, removeFcmToken } from '/apb-admin/firebase-init.js';
 import { getToken } from 'firebase/messaging';
 
 export function Settings({ show, onClose, adminDeviceId }) {
@@ -11,6 +11,10 @@ export function Settings({ show, onClose, adminDeviceId }) {
     if (!adminDeviceId) return;
 
     const handleToggle = async () => {
+      if (!messaging) {
+        console.error('messaging is not defined – проверьте firebase-init.js');
+        return;
+      }
       if (pushEnabled) {
         try {
           const registration = await navigator.serviceWorker.ready;
