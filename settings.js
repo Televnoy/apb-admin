@@ -1,4 +1,4 @@
-import { db, messaging, saveFcmToken, removeFcmToken } from '/apb-admin/firebase-init.js';
+import { saveFcmToken, removeFcmToken } from '/apb-admin/firebase-init.js';
 import { getToken } from 'firebase/messaging';
 
 export function Settings({ show, onClose, adminDeviceId }) {
