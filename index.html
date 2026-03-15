@@ -625,12 +625,9 @@
               {/* Дашборд (верхний слой) */}
               <div className="absolute left-1/2 transform -translate-x-1/2 z-20 max-w-[90%] sm:max-w-md">
               <div
+<div
   onClick={handleDashboardClick}
-  className={`rounded-full flex items-center overflow-hidden transition-all duration-300 ease-in-out cursor-pointer ${
-    currentEvent?.id === 'initial-load' 
-      ? 'bg-gray-200 text-gray-700'  // мягкий стиль для "Данные загружены"
-      : 'bg-black text-white'          // обычный стиль для событий
-  }`}
+  className="bg-black text-white rounded-full flex items-center overflow-hidden transition-all duration-300 ease-in-out cursor-pointer"
   style={{ maxWidth: currentEvent ? '500px' : '40px' }}
 >
                   <div className="p-2 flex-shrink-0">
