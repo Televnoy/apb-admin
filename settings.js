@@ -29,9 +29,8 @@ export function Settings({ show, onClose, adminDeviceId }) {
   const [loadingJudges, setLoadingJudges] = React.useState(false);
   const [generating, setGenerating] = React.useState(false);
   const [toast, setToast] = React.useState({ show: false, message: '' });
-  const [confirmDelete, setConfirmDelete] = React.useState(null); // Для подтверждения удаления
+  const [confirmDelete, setConfirmDelete] = React.useState(null);
 
-  // Копирование
   const copyToClipboard = async (text, label = 'Ключ') => {
     try {
       await navigator.clipboard.writeText(text);
@@ -44,7 +43,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
     }
   };
 
-  // Загрузка с кэшированием
   const loadJudges = async () => {
     setLoadingJudges(true);
     try {
@@ -73,7 +71,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
     if (show && window.lucide) setTimeout(() => lucide.createIcons(), 50);
   }, [show, judges, loadingJudges]);
 
-  // Отвязка устройства
   const handleDeviceToggle = async (judgeKey, currentDeviceId, checked) => {
     if (!checked) {
       try {
@@ -92,22 +89,17 @@ export function Settings({ show, onClose, adminDeviceId }) {
     }
   };
 
-  // ✅ Удаление ключа (с подтверждением)
-  const handleDeleteKey = async (judgeKey, judgeName) => {
-    if (!confirm(`Удалить ключ "${judgeName || judgeKey}"?\nЭто действие нельзя отменить.`)) {
-      return;
-    }
+  // ✅ Удаление ключа (без браузерного confirm)
+  const handleDeleteKey = async (judge) => {
     try {
-      // Если в firebase-init.js есть функция deleteJudgeKey:
       if (typeof deleteJudgeKey === 'function') {
-        await deleteJudgeKey(judgeKey);
+        await deleteJudgeKey(judge.key);
       } else {
-        // Fallback: если функции нет, удаляем через Firestore напрямую
         import('firebase/firestore').then(({ doc, deleteDoc }) => {
-          deleteDoc(doc(db, 'judges', judgeKey));
+          deleteDoc(doc(db, 'judges', judge.key));
         });
       }
-      setJudges(prev => prev.filter(j => j.key !== judgeKey));
+      setJudges(prev => prev.filter(j => j.key !== judge.key));
       setToast({ show: true, message: 'Ключ удалён' });
       setTimeout(() => setToast({ show: false, message: '' }), 1500);
     } catch (err) {
@@ -160,7 +152,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
 
   if (!show) return null;
 
-  // ✅ Тост — рендерим инлайн
   const toastElement = toast.show ? React.createElement(
     'div',
     { className: 'fixed inset-0 z-[300] flex items-center justify-center pointer-events-none' },
@@ -169,7 +160,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
     }, toast.message)
   ) : null;
 
-  // ✅ Модальное окно подтверждения удаления
   const confirmModal = confirmDelete ? React.createElement(
     'div',
     { 
@@ -193,13 +183,12 @@ export function Settings({ show, onClose, adminDeviceId }) {
         }, 'Отмена'),
         React.createElement('button', {
           className: 'px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition',
-          onClick: () => handleDeleteKey(confirmDelete.key, confirmDelete.name)
+          onClick: () => handleDeleteKey(confirmDelete)
         }, 'Удалить')
       )
     )
   ) : null;
 
-  // ✅ Скелетон — функция, принимающая ключ
   const renderSkeletonRow = (key) => React.createElement(
     'tr', { key, className: 'animate-pulse' },
     React.createElement('td', { className: 'px-4 py-3' }, React.createElement('div', { className: 'h-3 bg-gray-100 rounded w-full' })),
@@ -216,7 +205,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
       'div',
       { className: 'bg-white w-full max-w-4xl rounded-[32px] p-8 shadow-2xl space-y-6 border border-gray-100 max-h-[90vh] overflow-y-auto', onClick: e => e.stopPropagation() },
       
-      // Заголовок
       React.createElement('div', { className: 'flex justify-between items-center sticky top-0 bg-white pb-4 border-b border-gray-100 z-10' },
         React.createElement('h2', { className: 'text-xl font-light tracking-tight' }, 'Настройки'),
         React.createElement('button', { onClick: onClose, className: 'text-gray-400 hover:text-gray-600 transition' },
@@ -224,7 +212,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
         )
       ),
 
-      // Push
       React.createElement('div', { className: 'space-y-4' },
         React.createElement('div', { className: 'flex items-center justify-between' },
           React.createElement('span', { className: 'text-[13px] font-medium uppercase tracking-widest' }, 'Push-уведомления'),
@@ -244,7 +231,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
 
       React.createElement('hr', { className: 'border-gray-100' }),
 
-      // Таблица
       React.createElement('div', { className: 'space-y-4' },
         React.createElement('h3', { className: 'text-[11px] font-medium uppercase tracking-widest text-gray-500' }, 'Управление ключами судей'),
         React.createElement('div', { className: 'overflow-x-auto' },
@@ -268,7 +254,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
                   : judges.map((judge) => React.createElement(
                       'tr', { key: judge.key, className: 'hover:bg-gray-50 transition' },
                       
-                      // Ключ
                       React.createElement('td', {
                         className: 'px-4 py-3 font-mono text-[10px] cursor-pointer hover:text-blue-600 transition flex items-center gap-1',
                         onClick: () => copyToClipboard(judge.key, 'Ключ'),
@@ -282,10 +267,8 @@ export function Settings({ show, onClose, adminDeviceId }) {
                       React.createElement('td', { className: 'px-4 py-3' }, judge.city || '—'),
                       React.createElement('td', { className: 'px-4 py-3 text-[10px]' }, judge.deviceId ? judge.deviceId.substring(0, 12) + '…' : '—'),
                       
-                      // Действия: отвязка + удаление
                       React.createElement('td', { className: 'px-4 py-3' },
                         React.createElement('div', { className: 'flex items-center gap-3' },
-                          // Отвязка
                           React.createElement('label', { className: 'relative inline-flex items-center cursor-pointer', title: 'Отвязать устройство' },
                             React.createElement('input', {
                               type: 'checkbox', className: 'sr-only peer', checked: !!judge.deviceId,
@@ -294,7 +277,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
                             React.createElement('div', { className: 'w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-black transition' }),
                             React.createElement('div', { className: 'absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-4' })
                           ),
-                          // Удаление (иконка корзины)
                           React.createElement('button', {
                             className: 'text-gray-400 hover:text-red-600 transition p-1',
                             onClick: (e) => { e.stopPropagation(); setConfirmDelete(judge); },
@@ -309,7 +291,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
           )
         ),
 
-        // Кнопка генерации
         React.createElement('div', { className: 'flex justify-end mt-4' },
           React.createElement('button', {
             onClick: handleGenerateKey, disabled: generating,
