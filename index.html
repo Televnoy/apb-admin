@@ -2,22 +2,36 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#000000">
+    <meta name="description" content="АПБ Админ - система управления судьями">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
     <title>АПБ Админ</title>
     
-    <!-- 1. Подключаем Tailwind CSS для стилей -->
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/apb-admin/a-manifest (2).json">
+    <link rel="apple-touch-icon" href="/apb-admin/aicon-192.png">
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- 2. Подключаем иконки Lucide -->
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
-    <!-- 3. Подключаем React и ReactDOM -->
+    <!-- React & ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     
-    <!-- 4. Стили для прелоадера и анимаций -->
+    <!-- Стили -->
     <style>
-        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #f9fafb;
+            -webkit-tap-highlight-color: transparent;
+        }
         #preloader {
             position: fixed; inset: 0; background: #fff; z-index: 9999;
             display: flex; align-items: center; justify-content: center;
@@ -30,28 +44,25 @@
             border-radius: 50%; animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* Скроллбар для модальных окон */
         .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
-        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #555; }
-    </style>
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #555; }    </style>
 </head>
-<body class="bg-gray-50 text-gray-900">
-
-    <!-- Прелоадер (исчезнет после загрузки) -->
+<body>
+    <!-- Прелоадер -->
     <div id="preloader">
         <div class="spinner"></div>
     </div>
 
-    <!-- Сюда React будет рендерить приложение -->
+    <!-- Корневой элемент для React -->
     <div id="root"></div>
 
-    <!-- Основной скрипт приложения -->    <script type="module">
-        // Импортируем компонент настроек (путь должен совпадать с вашей структурой)
+    <!-- Основной скрипт приложения -->
+    <script type="module">
         import { Settings } from '/apb-admin/settings (1).js';
 
-        // Инициализация иконок после загрузки страницы
+        // Инициализация иконок
         const initIcons = () => {
             if (window.lucide) {
                 window.lucide.createIcons();
@@ -61,23 +72,22 @@
         // Главный компонент приложения
         const App = () => {
             const [showSettings, setShowSettings] = React.useState(false);
-            // Замените на реальный ID устройства админа или логику получения
-            const adminDeviceId = 'admin-device-' + Math.random().toString(36).substr(2, 9);
+            const adminDeviceId = 'admin-' + Math.random().toString(36).substr(2, 9);
 
-            // Скрываем прелоадер при монтировании
+            // Скрытие прелоадера
             React.useEffect(() => {
                 const timer = setTimeout(() => {
                     const preloader = document.getElementById('preloader');
                     if (preloader) preloader.classList.add('hidden');
                     initIcons();
-                }, 800); // Небольшая задержка для плавности
-
+                }, 500);
                 return () => clearTimeout(timer);
             }, []);
 
-            // Обновляем иконки каждый раз когда что-то меняется (для модальных окон)
+            // Обновление иконок при изменениях
             React.useEffect(() => {
-                initIcons();
+                const timer = setTimeout(initIcons, 100);
+                return () => clearTimeout(timer);
             });
 
             return React.createElement('div', { className: 'min-h-screen p-4 md:p-8' },
@@ -86,24 +96,22 @@
                     React.createElement('h1', { className: 'text-2xl font-bold tracking-tight' }, 'АПБ Админ'),
                     React.createElement(
                         'button',
-                        {
-                            onClick: () => setShowSettings(true),
-                            className: 'flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-full hover:bg-gray-800 transition shadow-lg hover:shadow-xl active:scale-95'
+                        {                            onClick: () => setShowSettings(true),
+                            className: 'flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-full hover:bg-gray-800 transition shadow-lg active:scale-95'
                         },
                         React.createElement('i', { 'data-lucide': 'settings', width: '18', height: '18' }),
                         React.createElement('span', { className: 'text-sm font-medium' }, 'Настройки')
                     )
                 ),
-
-                // Основной контент (заглушка, пока нет других страниц)
-                React.createElement('main', { className: 'space-y-6' },                    React.createElement(
+                // Контент
+                React.createElement('main', { className: 'space-y-6' },
+                    React.createElement(
                         'div', 
                         { className: 'bg-white p-6 rounded-3xl shadow-sm border border-gray-100' },
                         React.createElement('h2', { className: 'text-lg font-medium mb-2' }, 'Добро пожаловать'),
-                        React.createElement('p', { className: 'text-gray-500 text-sm' }, 'Выберите действие в меню или откройте настройки для управления ключами судей.')
+                        React.createElement('p', { className: 'text-gray-500 text-sm' }, 'Откройте настройки для управления ключами судей.')
                     )
                 ),
-
                 // Модальное окно настроек
                 React.createElement(Settings, {
                     show: showSettings,
@@ -113,9 +121,20 @@
             );
         };
 
-        // Рендеринг приложения
+        // Рендеринг
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(React.createElement(App));
+    </script>
+
+    <!-- Регистрация Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/apb-admin/a-sw (4).js')
+                    .then(reg => console.log('SW зарегистрирован:', reg.scope))
+                    .catch(err => console.log('SW ошибка:', err));
+            });
+        }
     </script>
 </body>
 </html>
