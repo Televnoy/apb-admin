@@ -10,12 +10,11 @@ export function Settings({ show, onClose, adminDeviceId }) {
   const [judges, setJudges] = React.useState([]);
   const [loadingJudges, setLoadingJudges] = React.useState(false);
   const [generating, setGenerating] = React.useState(false);
-  const [copiedKey, setCopiedKey] = React.useState(null);
+  const [toast, setToast] = React.useState(null); // { message, type }
 
   React.useEffect(() => {
     if (show) {
-      console.time('loadJudges');
-      loadJudges().finally(() => console.timeEnd('loadJudges'));
+      loadJudges();
     }
   }, [show]);
 
@@ -26,9 +25,15 @@ export function Settings({ show, onClose, adminDeviceId }) {
       setJudges(judgesList);
     } catch (err) {
       console.error('Ошибка загрузки ключей:', err);
+      showToast('Ошибка загрузки ключей', 'error');
     } finally {
       setLoadingJudges(false);
     }
+  };
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 2000);
   };
 
   const handleDeviceToggle = async (judgeKey, currentDeviceId, checked) => {
@@ -38,11 +43,13 @@ export function Settings({ show, onClose, adminDeviceId }) {
         setJudges(prev => prev.map(j => 
           j.key === judgeKey ? { ...j, deviceId: null } : j
         ));
+        showToast('Устройство отвязано');
       } catch (err) {
         console.error('Ошибка отвязки устройства:', err);
+        showToast('Ошибка отвязки', 'error');
       }
     } else {
-      console.log('Для привязки устройства необходим вход с этим ключом.');
+      showToast('Для привязки войдите с этим ключом', 'info');
     }
   };
 
@@ -51,8 +58,10 @@ export function Settings({ show, onClose, adminDeviceId }) {
     try {
       const newKey = await createJudgeKey();
       await loadJudges();
+      showToast(`Ключ ${newKey} создан`);
     } catch (err) {
       console.error('Ошибка создания ключа:', err);
+      showToast('Ошибка создания ключа', 'error');
     } finally {
       setGenerating(false);
     }
@@ -60,9 +69,11 @@ export function Settings({ show, onClose, adminDeviceId }) {
 
   const handleCopyKey = (key) => {
     navigator.clipboard.writeText(key).then(() => {
-      setCopiedKey(key);
-      setTimeout(() => setCopiedKey(null), 2000);
-    }).catch(err => console.error('Ошибка копирования:', err));
+      showToast('Ключ скопирован');
+    }).catch(err => {
+      console.error('Ошибка копирования:', err);
+      showToast('Ошибка копирования', 'error');
+    });
   };
 
   const handleDeleteKey = async (judgeKey) => {
@@ -70,8 +81,10 @@ export function Settings({ show, onClose, adminDeviceId }) {
       try {
         await deleteJudgeKey(judgeKey);
         setJudges(prev => prev.filter(j => j.key !== judgeKey));
+        showToast('Ключ удалён');
       } catch (err) {
         console.error('Ошибка удаления ключа:', err);
+        showToast('Ошибка удаления', 'error');
       }
     }
   };
@@ -94,18 +107,20 @@ export function Settings({ show, onClose, adminDeviceId }) {
             });
             if (token) {
               await saveFcmToken(adminDeviceId, token, navigator.userAgent);
-              console.log('Push enabled, token saved');
+              showToast('Push-уведомления включены');
             }
           }
         } catch (err) {
           console.error('Error enabling push:', err);
+          showToast('Ошибка включения push', 'error');
         }
       } else {
         try {
           await removeFcmToken(adminDeviceId);
-          console.log('Push disabled, token removed');
+          showToast('Push-уведомления отключены');
         } catch (err) {
           console.error('Error disabling push:', err);
+          showToast('Ошибка отключения push', 'error');
         }
       }
     };
@@ -182,95 +197,94 @@ export function Settings({ show, onClose, adminDeviceId }) {
         React.createElement(
           'div',
           { className: 'overflow-x-auto' },
-          React.createElement(
-            'table',
-            { className: 'min-w-full text-[11px]' },
-            React.createElement(
-              'thead',
-              { className: 'bg-gray-50 border-b border-gray-100' },
-              React.createElement(
-                'tr',
-                null,
-                React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Ключ'),
-                React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Имя'),
-                React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Город'),
-                React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'ID устройства'),
-                React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Отвязать'),
-                React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Действия')
+          loadingJudges
+            ? React.createElement(
+                'div',
+                { className: 'flex justify-center items-center py-8' },
+                React.createElement('div', { className: 'w-8 h-8 border-4 border-gray-200 border-t-black rounded-full animate-spin' })
               )
-            ),
-            React.createElement(
-              'tbody',
-              { className: 'divide-y divide-gray-50' },
-              loadingJudges
-                ? React.createElement(
+            : React.createElement(
+                'table',
+                { className: 'min-w-full text-[11px]' },
+                React.createElement(
+                  'thead',
+                  { className: 'bg-gray-50 border-b border-gray-100' },
+                  React.createElement(
                     'tr',
                     null,
-                    React.createElement('td', { colSpan: 6, className: 'px-4 py-4 text-center text-gray-400' }, 'Загрузка...')
+                    React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Ключ'),
+                    React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Имя'),
+                    React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Город'),
+                    React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'ID устройства'),
+                    React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Отвязать'),
+                    React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Действия')
                   )
-                : judges.length === 0
-                ? React.createElement(
-                    'tr',
-                    null,
-                    React.createElement('td', { colSpan: 6, className: 'px-4 py-4 text-center text-gray-400' }, 'Нет ключей')
-                  )
-                : judges.map((judge) =>
-                    React.createElement(
-                      'tr',
-                      { key: judge.key, className: 'hover:bg-gray-50' },
-                      React.createElement('td', { className: 'px-4 py-3 font-mono text-[10px]' }, 
+                ),
+                React.createElement(
+                  'tbody',
+                  { className: 'divide-y divide-gray-50' },
+                  judges.length === 0
+                    ? React.createElement(
+                        'tr',
+                        null,
+                        React.createElement('td', { colSpan: 6, className: 'px-4 py-4 text-center text-gray-400' }, 'Нет ключей')
+                      )
+                    : judges.map((judge) =>
                         React.createElement(
-                          'div',
-                          { className: 'flex items-center gap-1' },
-                          React.createElement('span', { className: 'truncate max-w-[100px]' }, judge.key),
-                          React.createElement(
-                            'button',
-                            {
-                              onClick: () => handleCopyKey(judge.key),
-                              className: 'text-gray-400 hover:text-black',
-                              title: 'Копировать ключ'
-                            },
-                            React.createElement('i', { 'data-lucide': 'copy', width: '14', height: '14' })
+                          'tr',
+                          { key: judge.key, className: 'hover:bg-gray-50' },
+                          React.createElement('td', { className: 'px-4 py-3 font-mono text-[10px]' }, 
+                            React.createElement(
+                              'div',
+                              { className: 'flex items-center gap-1' },
+                              React.createElement('span', { className: 'truncate max-w-[100px]' }, judge.key),
+                              React.createElement(
+                                'button',
+                                {
+                                  onClick: () => handleCopyKey(judge.key),
+                                  className: 'text-gray-400 hover:text-black',
+                                  title: 'Копировать ключ'
+                                },
+                                React.createElement('i', { 'data-lucide': 'copy', width: '14', height: '14' })
+                              )
+                            )
                           ),
-                          copiedKey === judge.key && React.createElement('span', { className: 'text-green-500 text-[9px]' }, 'Скопировано')
-                        )
-                      ),
-                      React.createElement('td', { className: 'px-4 py-3' }, judge.displayName || '—'),
-                      React.createElement('td', { className: 'px-4 py-3' }, judge.city || '—'),
-                      React.createElement('td', { className: 'px-4 py-3 text-[10px]' }, judge.deviceId ? judge.deviceId.substring(0, 12) + '…' : '—'),
-                      React.createElement(
-                        'td',
-                        { className: 'px-4 py-3' },
-                        React.createElement(
-                          'label',
-                          { className: 'relative inline-flex items-center cursor-pointer' },
-                          React.createElement('input', {
-                            type: 'checkbox',
-                            className: 'sr-only peer',
-                            checked: !!judge.deviceId,
-                            onChange: (e) => handleDeviceToggle(judge.key, judge.deviceId, e.target.checked)
-                          }),
-                          React.createElement('div', { className: 'w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-black transition' }),
-                          React.createElement('div', { className: 'absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5' })
-                        )
-                      ),
-                      React.createElement(
-                        'td',
-                        { className: 'px-4 py-3' },
-                        React.createElement(
-                          'button',
-                          {
-                            onClick: () => handleDeleteKey(judge.key),
-                            className: 'text-red-400 hover:text-red-600',
-                            title: 'Удалить ключ'
-                          },
-                          React.createElement('i', { 'data-lucide': 'trash-2', width: '16', height: '16' })
+                          React.createElement('td', { className: 'px-4 py-3' }, judge.displayName || '—'),
+                          React.createElement('td', { className: 'px-4 py-3' }, judge.city || '—'),
+                          React.createElement('td', { className: 'px-4 py-3 text-[10px]' }, judge.deviceId ? judge.deviceId.substring(0, 12) + '…' : '—'),
+                          React.createElement(
+                            'td',
+                            { className: 'px-4 py-3' },
+                            React.createElement(
+                              'label',
+                              { className: 'relative inline-flex items-center cursor-pointer' },
+                              React.createElement('input', {
+                                type: 'checkbox',
+                                className: 'sr-only peer',
+                                checked: !!judge.deviceId,
+                                onChange: (e) => handleDeviceToggle(judge.key, judge.deviceId, e.target.checked)
+                              }),
+                              React.createElement('div', { className: 'w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-black transition' }),
+                              React.createElement('div', { className: 'absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5' })
+                            )
+                          ),
+                          React.createElement(
+                            'td',
+                            { className: 'px-4 py-3' },
+                            React.createElement(
+                              'button',
+                              {
+                                onClick: () => handleDeleteKey(judge.key),
+                                className: 'text-red-400 hover:text-red-600',
+                                title: 'Удалить ключ'
+                              },
+                              React.createElement('i', { 'data-lucide': 'trash-2', width: '16', height: '16' })
+                            )
+                          )
                         )
                       )
-                    )
-                  )
-            )
-          )
+                )
+              )
         ),
 
         React.createElement(
@@ -286,6 +300,17 @@ export function Settings({ show, onClose, adminDeviceId }) {
             generating ? 'Генерация...' : 'Сгенерировать ключ'
           )
         )
+      ),
+
+      // Toast-уведомление
+      toast && React.createElement(
+        'div',
+        {
+          className: `fixed top-20 left-1/2 transform -translate-x-1/2 z-[250] px-6 py-3 rounded-full shadow-2xl text-[11px] font-medium uppercase tracking-wider ${
+            toast.type === 'error' ? 'bg-red-600 text-white' : toast.type === 'info' ? 'bg-blue-600 text-white' : 'bg-black text-white'
+          }`
+        },
+        toast.message
       )
     )
   );
