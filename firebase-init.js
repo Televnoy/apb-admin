@@ -98,3 +98,7 @@ export {
     createJudgeKey,
     deleteJudgeKey
 };
+// В firebase-init.js экспортируйте:
+export const deleteJudgeKey = async (key) => {
+  await deleteDoc(doc(db, 'judges', key));
+};
