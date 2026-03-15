@@ -333,6 +333,17 @@
           unsubscribe();
         };
       }, []);
+      
+      // 🔔 ПОКАЗ "ДАННЫЕ ЗАГРУЖЕНЫ" ПОСЛЕ ПЕРВОЙ ЗАГРУЗКИ
+React.useEffect(() => {
+  if (!loading && data.length >= 0 && !lastEventText) {
+    setCurrentEvent({ id: 'initial', text: 'Данные загружены', isTemporary: true });
+    const timer = setTimeout(() => {
+      setCurrentEvent(prev => prev?.id === 'initial' ? null : prev);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }
+}, [loading, data.length]);
 
       React.useEffect(() => {
         if (scrollRef.current) {
