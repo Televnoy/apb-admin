@@ -7,17 +7,48 @@ const urlsToCache = [
   '/apb-admin/aicon-512.png'
 ];
 
+// 🔥 URLs, которые НЕЛЬЗЯ кэшировать (API, стримы, внешние сервисы)
+const EXCLUDED_PATTERNS = [
+  'firestore.googleapis.com',
+  'identitytoolkit.googleapis.com',  // Firebase Auth
+  'securetoken.googleapis.com',      // Firebase Token
+  'fcm.googleapis.com',              // Firebase Messaging
+  'googleapis.com',                  // Остальные Google API
+  'localhost:',                       // Локальная разработка
+  '127.0.0.1',
+  '.sock',                           // WebSocket
+  'listen'                           // Firestore long-polling
+];
+
+// ✅ Проверка: можно ли обрабатывать запрос через SW
+function shouldInterceptRequest(url) {
+  try {
+    const parsed = new URL(url);
+    // Исключаем внешние домены и паттерны
+    for (const pattern of EXCLUDED_PATTERNS) {
+      if (parsed.hostname.includes(pattern) || parsed.pathname.includes(pattern)) {
+        return false;
+      }
+    }
+    // Разрешаем только same-origin или явно разрешённые пути
+    return parsed.origin === self.location.origin || 
+           url.startsWith('/apb-admin/');
+  } catch {
+    return false;
+  }
+}
+
 // ✅ Проверка: можно ли кэшировать ответ
 function isCacheableResponse(response) {
   if (!response) return false;
-  // Opaque-ответы (cross-origin без CORS) кэшируем, но не проверяем статус
   if (response.type === 'opaque') return true;
-  // Кэшируем только успешные ответы 200
   return response.ok && response.status === 200;
 }
 
-// ✅ Улучшенная функция кэширования с защитой
+// ✅ Кэширование с защитой
 async function cacheResource(request, cacheName) {
+  if (!shouldInterceptRequest(request.url)) return;
+  
   try {
     const cache = await caches.open(cacheName);
     const response = await fetch(request);
@@ -26,41 +57,38 @@ async function cacheResource(request, cacheName) {
       await cache.put(request, response.clone());
     }
   } catch (e) {
-    console.warn('⚠️ Не удалось закэшировать:', request.url, e?.message);
+    console.debug('⚠️ Не закэшировано:', request.url);
   }
 }
 
-// Установка SW и кэширование
+// Установка
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(async cache => {
         console.log('✅ Кэш открыт');
-        // Кэшируем ресурсы по одному с обработкой ошибок
         for (const url of urlsToCache) {
           try {
             const response = await fetch(url);
-            if (response.ok) {
+            if (response?.ok) {
               await cache.put(url, response);
               console.log('✓ Закэширован:', url);
             }
           } catch (err) {
-            console.warn('⚠️ Не удалось закэшировать', url, err);
+            console.warn('⚠️ Не удалось закэшировать', url);
           }
         }
       })
-      .catch(err => console.warn('❌ Ошибка кэширования:', err))
   );
   self.skipWaiting();
 });
 
-// Активация и очистка старого кэша
+// Активация
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
-        keys.filter(key => key !== CACHE_NAME)
-            .map(key => caches.delete(key))
+        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
       )
     ).then(() => {
       console.log('🧹 Старый кэш очищен');
@@ -69,14 +97,17 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Стратегия: Cache First + Background Update
+// 🔥 Главный обработчик fetch
 self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
+  // Игнорируем не-GET и внешние API
+  if (event.request.method !== 'GET' || !shouldInterceptRequest(event.request.url)) {
+    return; // ❌ Не перехватываем — пусть идёт напрямую в сеть
+  }
 
   event.respondWith(
     caches.match(event.request)
       .then(async cachedResponse => {
-        // ✅ Есть в кэше — отдаём сразу, обновляем в фоне
+        // 📦 Есть в кэше — отдаём, обновляем в фоне
         if (cachedResponse) {
           event.waitUntil(
             (async () => {
@@ -87,7 +118,6 @@ self.addEventListener('fetch', event => {
                   await cache.put(event.request, networkResponse.clone());
                 }
               } catch (e) {
-                // Игнорируем ошибки фонового обновления
                 console.debug('🔄 Background update failed:', event.request.url);
               }
             })()
@@ -95,7 +125,7 @@ self.addEventListener('fetch', event => {
           return cachedResponse;
         }
 
-        // ❌ Нет в кэше — идём в сеть
+        // 🌐 Нет в кэше — идём в сеть
         try {
           const networkResponse = await fetch(event.request);
           if (isCacheableResponse(networkResponse)) {
@@ -104,15 +134,21 @@ self.addEventListener('fetch', event => {
           }
           return networkResponse;
         } catch (err) {
-          // 📴 Офлайн — возвращаем заглушку
-          console.warn('📴 Offline, returning fallback:', event.request.url);
-          return caches.match('/apb-admin/index.html');
+          // 📴 Офлайн для статики — возвращаем заглушку
+          // Но ТОЛЬКО для HTML-навигации, не для API!
+          if (event.request.destination === 'document') {
+            console.warn('📴 Offline, returning index.html');
+            return caches.match('/apb-admin/index.html');
+          }
+          // Для API/JS/CSS — возвращаем ошибку, чтобы приложение увидело проблему
+          console.warn('📴 Offline, cannot fetch:', event.request.url);
+          return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
         }
       })
   );
 });
 
-// Push-уведомления
+// Push
 self.addEventListener('push', event => {
   let title = 'АПБ Админ';
   let body = 'Новое событие';
@@ -125,26 +161,22 @@ self.addEventListener('push', event => {
         title = payload.notification.title || title;
         body = payload.notification.body || body;
       }
-      if (payload.data) {
-        data = { ...data, ...payload.data };
-      }
+      if (payload.data) data = { ...data, ...payload.data };
     } catch (e) {
       body = event.data.text() || body;
     }
   }
 
-  const options = {
-    body: body,
-    icon: '/apb-admin/aicon-192.png',
-    badge: '/apb-admin/aicon-72.png',
-    vibrate: [200, 100, 200],
-    data,
-    tag: 'apb-notification',
-    renotify: true
-  };
-
   event.waitUntil(
-    self.registration.showNotification(title, options)
+    self.registration.showNotification(title, {
+      body,
+      icon: '/apb-admin/aicon-192.png',
+      badge: '/apb-admin/aicon-72.png',
+      vibrate: [200, 100, 200],
+      data,
+      tag: 'apb-notification',
+      renotify: true
+    })
   );
 });
 
@@ -161,16 +193,12 @@ self.addEventListener('notificationclick', event => {
             return client.focus();
           }
         }
-        if (clients.openWindow) {
-          return clients.openWindow(urlToOpen);
-        }
+        if (clients.openWindow) return clients.openWindow(urlToOpen);
       })
   );
 });
 
-// Сообщение от приложения (например, для обновления SW)
+// Сообщения от приложения
 self.addEventListener('message', event => {
-  if (event.data && event.data.action === 'skipWaiting') {
-    self.skipWaiting();
-  }
+  if (event.data?.action === 'skipWaiting') self.skipWaiting();
 });
