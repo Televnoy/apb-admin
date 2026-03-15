@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { db, messaging, saveFcmToken, removeFcmToken, getJudges, updateJudgeDevice, createJudgeKey, deleteJudgeKey } from '/apb-admin/firebase-init.js';
 import { getToken } from 'firebase/messaging';
 
@@ -18,18 +19,21 @@ const injectCriticalStyles = () => {
 };
 
 export function Settings({ show, onClose, adminDeviceId }) {
-  React.useEffect(() => { injectCriticalStyles(); }, []);
-
-  const [pushEnabled, setPushEnabled] = React.useState(() => {
+  useEffect(() => { injectCriticalStyles(); }, []);
+  
+  const [pushEnabled, setPushEnabled] = useState(() => {
     const saved = localStorage.getItem('pushEnabled');
     return saved === null ? true : saved === 'true';
   });
-
-  const [judges, setJudges] = React.useState([]);
-  const [loadingJudges, setLoadingJudges] = React.useState(false);
-  const [generating, setGenerating] = React.useState(false);
-  const [toast, setToast] = React.useState({ show: false, message: '' });
-  const [confirmDelete, setConfirmDelete] = React.useState(null); // Для модального окна подтверждения
+  const [judges, setJudges] = useState([]);
+  const [loadingJudges, setLoadingJudges] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '' });
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  
+  // ✅ Состояние для проверки обновлений
+  const [updateStatus, setUpdateStatus] = useState('idle'); // idle, checking, available, current, error
+  const [updateMessage, setUpdateMessage] = useState('');
 
   const copyToClipboard = async (text, label = 'Ключ') => {
     try {
@@ -65,9 +69,9 @@ export function Settings({ show, onClose, adminDeviceId }) {
     }
   };
 
-  React.useEffect(() => { if (show) loadJudges(); }, [show]);
-
-  React.useEffect(() => {
+  useEffect(() => { if (show) loadJudges(); }, [show]);
+  
+  useEffect(() => {
     if (show && window.lucide) setTimeout(() => lucide.createIcons(), 50);
   }, [show, judges, loadingJudges]);
 
@@ -89,7 +93,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
     }
   };
 
-  // ✅ Удаление ключа — только через модальное окно, без браузерного confirm
   const handleDeleteKey = async (judge) => {
     try {
       if (typeof deleteJudgeKey === 'function') {
@@ -107,7 +110,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
       setToast({ show: true, message: 'Ошибка удаления' });
       setTimeout(() => setToast({ show: false, message: '' }), 2000);
     }
-    setConfirmDelete(null); // Закрываем модалку
+    setConfirmDelete(null);
   };
 
   const handleGenerateKey = async () => {
@@ -126,7 +129,109 @@ export function Settings({ show, onClose, adminDeviceId }) {
     }
   };
 
-  React.useEffect(() => {
+  // ✅ Проверка обновлений - сравнение кэшированных файлов с сервером
+  const checkForUpdates = async () => {
+    setUpdateStatus('checking');
+    setUpdateMessage('Проверка...');
+    
+    try {
+      const CACHE_NAME = 'apb-admin-v1';
+      const urlsToCheck = [
+        '/apb-admin/index.html',
+        '/apb-admin/a-manifest.json',
+        '/apb-admin/aicon-72.png',
+        '/apb-admin/aicon-192.png',
+        '/apb-admin/aicon-512.png'
+      ];
+      
+      let hasUpdates = false;
+      const cache = await caches.open(CACHE_NAME);
+      
+      for (const url of urlsToCheck) {
+        try {
+          // Получаем кэшированную версию
+          const cachedResponse = await cache.match(url);
+          // Получаем актуальную версию с сервера (с bypass кэша)
+          const networkResponse = await fetch(url, { cache: 'no-cache' });
+          
+          if (!cachedResponse) {
+            // Файла нет в кэше - значит есть обновление
+            hasUpdates = true;
+            break;
+          }
+          
+          // Сравниваем заголовки Last-Modified или ETag
+          const cachedLastModified = cachedResponse.headers.get('Last-Modified');
+          const networkLastModified = networkResponse.headers.get('Last-Modified');
+          const cachedETag = cachedResponse.headers.get('ETag');
+          const networkETag = networkResponse.headers.get('ETag');
+          
+          // Если есть ETag - сравниваем его
+          if (cachedETag && networkETag && cachedETag !== networkETag) {
+            hasUpdates = true;
+            break;
+          }
+          
+          // Если есть Last-Modified - сравниваем его
+          if (cachedLastModified && networkLastModified && cachedLastModified !== networkLastModified) {
+            hasUpdates = true;
+            break;
+          }
+          
+          // Если нет заголовков - сравниваем размер контента
+          const cachedText = await cachedResponse.text();
+          const networkText = await networkResponse.text();
+          if (cachedText !== networkText) {
+            hasUpdates = true;
+            break;
+          }
+        } catch (err) {
+          console.warn('Не удалось проверить файл:', url, err);
+        }
+      }
+      
+      if (hasUpdates) {
+        setUpdateStatus('available');
+        setUpdateMessage('Есть обновление');
+      } else {
+        setUpdateStatus('current');
+        setUpdateMessage('Актуальная версия');
+      }
+    } catch (err) {
+      console.error('Ошибка проверки обновлений:', err);
+      setUpdateStatus('error');
+      setUpdateMessage('Ошибка проверки');
+    }
+  };
+
+  // ✅ Очистка кэша и перезагрузка
+  const clearCacheAndReload = async () => {
+    try {
+      const CACHE_NAME = 'apb-admin-v1';
+      const cacheKeys = await caches.keys();
+      for (const key of cacheKeys) {
+        if (key === CACHE_NAME) {
+          await caches.delete(key);
+        }
+      }
+      
+      // Отправляем сообщение сервис-воркеру
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ action: 'skipWaiting' });
+      }
+      
+      setToast({ show: true, message: 'Кэш очищен, перезагрузка...' });
+      setTimeout(() => {
+        window.location.reload(true);
+      }, 1000);
+    } catch (err) {
+      console.error('Ошибка очистки кэша:', err);
+      setToast({ show: true, message: 'Ошибка обновления' });
+      setTimeout(() => setToast({ show: false, message: '' }), 2000);
+    }
+  };
+
+  useEffect(() => {
     if (!adminDeviceId) return;
     const handlePushToggle = async () => {
       if (pushEnabled) {
@@ -152,7 +257,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
 
   if (!show) return null;
 
-  // Тост
   const toastElement = toast.show ? React.createElement(
     'div',
     { className: 'fixed inset-0 z-[300] flex items-center justify-center pointer-events-none' },
@@ -161,21 +265,20 @@ export function Settings({ show, onClose, adminDeviceId }) {
     }, toast.message)
   ) : null;
 
-  // Модальное окно подтверждения удаления
   const confirmModal = confirmDelete ? React.createElement(
     'div',
-    { 
+    {
       className: 'fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/60',
       onClick: () => setConfirmDelete(null)
     },
     React.createElement(
       'div',
-      { 
+      {
         className: 'bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl',
         onClick: e => e.stopPropagation()
       },
       React.createElement('h3', { className: 'text-lg font-medium mb-2' }, 'Подтвердите удаление'),
-      React.createElement('p', { className: 'text-sm text-gray-600 mb-4' }, 
+      React.createElement('p', { className: 'text-sm text-gray-600 mb-4' },
         `Вы действительно хотите удалить ключ "${confirmDelete.name || confirmDelete.key}"?`
       ),
       React.createElement('div', { className: 'flex gap-3 justify-end' },
@@ -191,7 +294,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
     )
   ) : null;
 
-  // Скелетон для загрузки (с ключом)
   const renderSkeletonRow = (key) => React.createElement(
     'tr', { key, className: 'animate-pulse' },
     React.createElement('td', { className: 'px-4 py-3' }, React.createElement('div', { className: 'h-3 bg-gray-100 rounded w-full' })),
@@ -255,12 +357,11 @@ export function Settings({ show, onClose, adminDeviceId }) {
                 ? Array.from({ length: 3 }).map((_, i) => renderSkeletonRow(i))
                 : judges.length === 0
                   ? React.createElement('tr', { key: 'empty' },
-                      React.createElement('td', { colSpan: 6, className: 'px-4 py-8 text-center text-gray-400' }, 'Нет ключей')
+                      React.createElement('td', { colSpan: 5, className: 'px-4 py-8 text-center text-gray-400' }, 'Нет ключей')
                     )
                   : judges.map((judge) => React.createElement(
                       'tr', { key: judge.key, className: 'hover:bg-gray-50 transition' },
                       
-                      // Ключ (кликабельный для копирования)
                       React.createElement('td', {
                         className: 'px-4 py-3 font-mono text-[10px] cursor-pointer hover:text-blue-600 transition flex items-center gap-1',
                         onClick: () => copyToClipboard(judge.key, 'Ключ'),
@@ -274,10 +375,8 @@ export function Settings({ show, onClose, adminDeviceId }) {
                       React.createElement('td', { className: 'px-4 py-3' }, judge.city || '—'),
                       React.createElement('td', { className: 'px-4 py-3 text-[10px]' }, judge.deviceId ? judge.deviceId.substring(0, 12) + '…' : '—'),
                       
-                      // Действия: отвязка и удаление
                       React.createElement('td', { className: 'px-4 py-3' },
                         React.createElement('div', { className: 'flex items-center gap-3' },
-                          // Переключатель отвязки
                           React.createElement('label', { className: 'relative inline-flex items-center cursor-pointer', title: 'Отвязать устройство' },
                             React.createElement('input', {
                               type: 'checkbox', className: 'sr-only peer', checked: !!judge.deviceId,
@@ -286,7 +385,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
                             React.createElement('div', { className: 'w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-black transition' }),
                             React.createElement('div', { className: 'absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-4' })
                           ),
-                          // Кнопка удаления
                           React.createElement('button', {
                             className: 'text-gray-400 hover:text-red-600 transition p-1',
                             onClick: (e) => { e.stopPropagation(); setConfirmDelete(judge); },
@@ -314,10 +412,43 @@ export function Settings({ show, onClose, adminDeviceId }) {
                 )
               : 'Сгенерировать ключ'
           )
+        ),
+
+        // ✅ Блок проверки обновлений
+        React.createElement('div', { className: 'flex flex-col items-end mt-2 space-y-2' },
+          // Кнопка проверки
+          React.createElement('button', {
+            onClick: checkForUpdates,
+            disabled: updateStatus === 'checking',
+            className: 'text-black text-[10px] font-medium uppercase tracking-wider hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2'
+          },
+            updateStatus === 'checking'
+              ? React.createElement(React.Fragment, null,
+                  React.createElement('div', { className: 'w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin' }),
+                  'Проверка...'
+                )
+              : 'Проверить обновление'
+          ),
+          
+          // Статус обновления
+          updateStatus !== 'idle' && updateStatus !== 'checking' && React.createElement(
+            'button', {
+              onClick: updateStatus === 'available' ? clearCacheAndReload : undefined,
+              className: `text-[10px] font-medium tracking-wider transition ${
+                updateStatus === 'available' 
+                  ? 'text-green-600 hover:text-green-700 cursor-pointer' 
+                  : updateStatus === 'current'
+                  ? 'text-gray-400 cursor-default'
+                  : 'text-red-500 cursor-default'
+              }`
+            },
+            updateStatus === 'available' && React.createElement('span', { className: 'mr-1' }, '●'),
+            updateMessage
+          )
         )
       )
     ),
-    
+
     toastElement,
     confirmModal
   );
