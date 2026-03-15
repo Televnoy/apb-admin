@@ -1,4 +1,4 @@
-const CACHE_NAME = 'apb-admin-v1'; // Убрана лишняя запятая
+const CACHE_NAME = 'apb-admin-v1';
 const urlsToCache = [
   '/apb-admin/index.html',
   '/apb-admin/a-manifest.json',
@@ -7,26 +7,49 @@ const urlsToCache = [
   '/apb-admin/aicon-512.png'
 ];
 
+// ✅ Проверка: можно ли кэшировать ответ
+function isCacheableResponse(response) {
+  if (!response) return false;
+  // Opaque-ответы (cross-origin без CORS) кэшируем, но не проверяем статус
+  if (response.type === 'opaque') return true;
+  // Кэшируем только успешные ответы 200
+  return response.ok && response.status === 200;
+}
+
+// ✅ Улучшенная функция кэширования с защитой
 async function cacheResource(request, cacheName) {
-  const cache = await caches.open(cacheName);
   try {
+    const cache = await caches.open(cacheName);
     const response = await fetch(request);
-    if (response.ok) {
-      cache.put(request, response.clone());
+    
+    if (isCacheableResponse(response)) {
+      await cache.put(request, response.clone());
     }
   } catch (e) {
-    console.warn('Не удалось закэшировать', request.url);
+    console.warn('⚠️ Не удалось закэшировать:', request.url, e?.message);
   }
 }
+
 // Установка SW и кэширование
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Кэш открыт');
-        return cache.addAll(urlsToCache);
+      .then(async cache => {
+        console.log('✅ Кэш открыт');
+        // Кэшируем ресурсы по одному с обработкой ошибок
+        for (const url of urlsToCache) {
+          try {
+            const response = await fetch(url);
+            if (response.ok) {
+              await cache.put(url, response);
+              console.log('✓ Закэширован:', url);
+            }
+          } catch (err) {
+            console.warn('⚠️ Не удалось закэшировать', url, err);
+          }
+        }
       })
-      .catch(err => console.warn('Ошибка кэширования:', err))
+      .catch(err => console.warn('❌ Ошибка кэширования:', err))
   );
   self.skipWaiting();
 });
@@ -39,48 +62,57 @@ self.addEventListener('activate', event => {
         keys.filter(key => key !== CACHE_NAME)
             .map(key => caches.delete(key))
       )
-    ).then(() => self.clients.claim())
+    ).then(() => {
+      console.log('🧹 Старый кэш очищен');
+      return self.clients.claim();
+    })
   );
 });
 
-
-// Стратегия: Cache First, затем Network (для скорости)
+// Стратегия: Cache First + Background Update
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
     caches.match(event.request)
-      .then(cachedResponse => {
+      .then(async cachedResponse => {
+        // ✅ Есть в кэше — отдаём сразу, обновляем в фоне
         if (cachedResponse) {
-          // Отдаем из кэша, но обновляем в фоне
           event.waitUntil(
-            fetch(event.request)
-              .then(networkResponse => {
-                if (networkResponse && networkResponse.status === 200) {
-                  caches.open(CACHE_NAME).then(cache => cache.put(event.request, networkResponse));
+            (async () => {
+              try {
+                const networkResponse = await fetch(event.request);
+                if (isCacheableResponse(networkResponse)) {
+                  const cache = await caches.open(CACHE_NAME);
+                  await cache.put(event.request, networkResponse.clone());
                 }
-              })              .catch(() => {})
+              } catch (e) {
+                // Игнорируем ошибки фонового обновления
+                console.debug('🔄 Background update failed:', event.request.url);
+              }
+            })()
           );
           return cachedResponse;
         }
-        // Если нет в кэше, идем в сеть
-        return fetch(event.request)
-          .then(networkResponse => {
-            if (networkResponse && networkResponse.status === 200) {
-              const responseToCache = networkResponse.clone();
-              caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseToCache));
-            }
-            return networkResponse;
-          })
-          .catch(() => {
-            // Если офлайн, можно вернуть заглушку
-            return caches.match('/apb-admin/index.html');
-          });
+
+        // ❌ Нет в кэше — идём в сеть
+        try {
+          const networkResponse = await fetch(event.request);
+          if (isCacheableResponse(networkResponse)) {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(event.request, networkResponse.clone());
+          }
+          return networkResponse;
+        } catch (err) {
+          // 📴 Офлайн — возвращаем заглушку
+          console.warn('📴 Offline, returning fallback:', event.request.url);
+          return caches.match('/apb-admin/index.html');
+        }
       })
   );
 });
 
-// Обработка Push-уведомлений
+// Push-уведомления
 self.addEventListener('push', event => {
   let title = 'АПБ Админ';
   let body = 'Новое событие';
@@ -106,9 +138,10 @@ self.addEventListener('push', event => {
     icon: '/apb-admin/aicon-192.png',
     badge: '/apb-admin/aicon-72.png',
     vibrate: [200, 100, 200],
-     data,
-    tag: 'apb-notification', // Группирует уведомления
-    renotify: true  };
+    data,
+    tag: 'apb-notification',
+    renotify: true
+  };
 
   event.waitUntil(
     self.registration.showNotification(title, options)
