@@ -10,26 +10,14 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="apple-touch-icon" href="/apb-admin/aapple-touch-icon.png" />
   <title>АПБ Админ</title>
-  
-  <!-- Оптимизация: предзагрузка критических ресурсов -->
-  <link rel="preconnect" href="https://cdn.tailwindcss.com" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600&display=swap" as="style" />
-  
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Шрифты с font-display: swap для мгновенного отображения текста -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600&display=swap" rel="stylesheet">
-  
-  <!-- React & ReactDOM (production версии для скорости) -->
-  <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
-  
-  <!-- Lucide Icons -->
+  <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
-  
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <!-- Import map for Firebase modules -->
   <script type="importmap">
     {
@@ -40,85 +28,92 @@
       }
     }
   </script>
-  
   <!-- Наш модуль инициализации Firebase -->
   <script type="module" src="/apb-admin/firebase-init.js"></script>
-  <!-- Компонент настроек (без JSX) -->
+  <!-- Компонент настроек -->
   <script type="module" src="/apb-admin/settings.js"></script>
-  
   <style>
-    * { font-family: 'Inter', sans-serif; box-sizing: border-box; }    body { margin: 0; padding: 0; background: #f9fafb; -webkit-tap-highlight-color: transparent; }
-    
-    /* Скрытие скроллбара */
+    * {
+      font-family: 'Inter', sans-serif;
+    }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-    
-    /* Анимации */
-    @keyframes fadeIn { from { opacity: 0; transform: translateX(-5px); } to { opacity: 1; transform: translateX(0); } }
-    .event-text { animation: fadeIn 0.3s ease-out; }
-    
-    /* Оптимизированный прелоадер */
-    .preloader {
-      position: fixed; inset: 0; background: #fff; z-index: 9999;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      transition: opacity 0.2s ease;
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(-5px); }
+      to { opacity: 1; transform: translateX(0); }
     }
-    .preloader.hidden { opacity: 0; pointer-events: none; }
+    .event-text {
+      animation: fadeIn 0.3s ease-out;
+    }
+    /* Стили для прелоадера */
+    .preloader-container {
+      text-align: center;
+      width: 100%;
+      max-width: 280px;
+    }
     .preloader-text {
-      font-weight: 200; font-size: 0.85rem; letter-spacing: 0.15em;
-      color: #000; margin-bottom: 24px; text-transform: lowercase;
+      font-weight: 200;
+      font-size: 0.85rem;
+      letter-spacing: 0.15em;
+      color: #000;
+      margin-bottom: 24px;
+      text-transform: lowercase;
       animation: blink 2s ease-in-out infinite;
     }
-    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-    .preloader-progress {
-      width: 200px; height: 1px; background: #f2f2f2; margin-bottom: 12px; position: relative;
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
     }
-    .preloader-bar {
-      height: 100%; width: 0%; background: #000;
-      transition: width 0.2s ease-out; will-change: width;
+    .preloader-progress-container {
+      width: 100%;
+      height: 1px;
+      background-color: #f2f2f2;
+      margin-bottom: 12px;
+      position: relative;
     }
-    .preloader-percent {
-      font-weight: 100; font-size: 0.75rem; color: #666; letter-spacing: 0.1em;
+    .preloader-progress-bar {
+      height: 100%;
+      width: 0%;
+      background-color: #000;
+      transition: width 0.3s ease-out;
     }
-    
-    /* Плавное появление интерфейса */
-    .ui-ready { animation: fadeInUI 0.3s ease-out forwards; }
-    @keyframes fadeInUI { from { opacity: 0; } to { opacity: 1; } }
-    
-    /* Оптимизация: отключаем лишние переходы на мобильных */
-    @media (max-width: 640px) {
-      * { transition: none !important; }
+    .preloader-percentage {
+      font-weight: 100;
+      font-size: 0.75rem;
+      color: #666;
+      letter-spacing: 0.1em;
+      margin-top: 8px;
+    }
+    .fade-in-ui {
+      animation: fadeInUI 1s ease-out forwards;
+    }
+    @keyframes fadeInUI {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
     }
   </style>
 </head>
 <body>
-  <!-- Оптимизированный прелоадер -->
-  <div id="preloader" class="preloader">
-    <div class="preloader-text">загрузка...</div>
-    <div class="preloader-progress"><div id="preloaderBar" class="preloader-bar"></div></div>
-    <div id="preloaderPercent" class="preloader-percent">0%</div>  </div>
-
   <div id="root"></div>
-
-  <!-- Основной скрипт приложения (без Babel - чистый React.createElement) -->
-  <script type="module">
+  <script type="text/babel" data-type="module">
     import { db, messaging } from '/apb-admin/firebase-init.js';
     import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
     import { onMessage } from 'firebase/messaging';
     import { Settings } from '/apb-admin/settings.js';
 
-    const MONTHS = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+    const MONTHS = [
+      "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+      "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ];
 
-    // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
-    const createElement = React.createElement;
-
-    // ========== КОМПОНЕНТ APP ==========
     function App() {
-      // Состояния
       const [data, setData] = React.useState([]);
       const [loading, setLoading] = React.useState(true);
       const [selectedCity, setSelectedCity] = React.useState('Все города');
-      const [selectedDate, setSelectedDate] = React.useState({ month: new Date().getMonth(), year: new Date().getFullYear() });
+      const [selectedDate, setSelectedDate] = React.useState({
+        month: new Date().getMonth(),
+        year: new Date().getFullYear()
+      });
       const [selectedDay, setSelectedDay] = React.useState(null);
       const [currentEvent, setCurrentEvent] = React.useState(null);
       const [lastEventText, setLastEventText] = React.useState('');
@@ -131,39 +126,39 @@
       const [showCalendar, setShowCalendar] = React.useState(false);
       const [showUpdateNotification, setShowUpdateNotification] = React.useState(false);
       const [adminDeviceId, setAdminDeviceId] = React.useState('');
+
       const [showPushSettings, setShowPushSettings] = React.useState(false);
       const [progress, setProgress] = React.useState(0);
 
-      // Рефы
       const scrollRef = React.useRef(null);
       const calendarRef = React.useRef(null);
       const eventTimeoutRef = React.useRef(null);
       const tempEventTimeoutRef = React.useRef(null);
 
-      // Очистка таймеров при размонтировании
       React.useEffect(() => {
         return () => {
           if (eventTimeoutRef.current) clearTimeout(eventTimeoutRef.current);
           if (tempEventTimeoutRef.current) clearTimeout(tempEventTimeoutRef.current);
-        };      }, []);
+        };
+      }, []);
 
-      // Прогресс загрузки (оптимизировано)
       React.useEffect(() => {
         if (!loading) return;
-        let frameId;
-        const animate = () => {
+        let interval = setInterval(() => {
           setProgress(prev => {
-            if (prev >= 100) return 100;
-            return Math.min(100, prev + Math.random() * 5);
+            const increment = Math.random() * 3;
+            const next = prev + increment;
+            if (next >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return next;
           });
-          if (progress < 100) frameId = requestAnimationFrame(animate);
-        };
-        frameId = requestAnimationFrame(animate);
-        return () => cancelAnimationFrame(frameId);
+        }, 50);
+        return () => clearInterval(interval);
       }, [loading]);
 
-      // Показ события
-      const showEvent = React.useCallback((text, isTemporary = false) => {
+      const showEvent = (text, isTemporary = false) => {
         if (isTemporary) {
           if (!lastEventText) return;
           if (tempEventTimeoutRef.current) clearTimeout(tempEventTimeoutRef.current);
@@ -181,69 +176,80 @@
             eventTimeoutRef.current = null;
           }, 30000);
         }
-      }, [lastEventText]);
+      };
 
-      // Обработчик клика по дашборду
-      const handleDashboardClick = React.useCallback(() => {
+      const handleDashboardClick = () => {
         if (currentEvent && !currentEvent.isTemporary) {
           if (eventTimeoutRef.current) clearTimeout(eventTimeoutRef.current);
           setCurrentEvent(prev => ({ ...prev, id: Date.now() }));
-          eventTimeoutRef.current = setTimeout(() => { setCurrentEvent(null); eventTimeoutRef.current = null; }, 30000);
-        } else if (lastEventText) {
-          showEvent(lastEventText, true);
+          eventTimeoutRef.current = setTimeout(() => {
+            setCurrentEvent(null);
+            eventTimeoutRef.current = null;
+          }, 30000);
+        } else {
+          if (lastEventText) {
+            showEvent(lastEventText, true);
+          }
         }
-      }, [currentEvent, lastEventText, showEvent]);
+      };
 
-      // beforeinstallprompt      React.useEffect(() => {
-        const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); };
-        window.addEventListener('beforeinstallprompt', handler);
-        return () => window.removeEventListener('beforeinstallprompt', handler);
+      React.useEffect(() => {
+        window.addEventListener('beforeinstallprompt', (e) => {
+          e.preventDefault();
+          setDeferredPrompt(e);
+        });
       }, []);
 
-      // Закрытие календаря при клике вне
       React.useEffect(() => {
-        const handleClickOutside = (e) => {
-          if (calendarRef.current && !calendarRef.current.contains(e.target)) setShowCalendar(false);
+        const handleClickOutside = (event) => {
+          if (calendarRef.current && !calendarRef.current.contains(event.target)) {
+            setShowCalendar(false);
+          }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
       }, []);
 
-      // Установка PWA
-      const handleInstallClick = React.useCallback(async () => {
+      const handleInstallClick = async () => {
         if (!deferredPrompt) return;
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
         if (outcome === 'accepted') setDeferredPrompt(null);
-      }, [deferredPrompt]);
+      };
 
-      // Обновление PWA
-      const handleUpdateClick = React.useCallback(() => {
-        if (navigator.serviceWorker?.controller) {
+      const handleUpdateClick = () => {
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
           navigator.serviceWorker.controller.postMessage({ action: 'skipWaiting' });
-          navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true });
         }
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload();
+        });
         setShowUpdateNotification(false);
-      }, []);
+      };
 
-      // Регистрация Service Worker
       React.useEffect(() => {
         if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.register('/apb-admin/a-sw.js').then((reg) => {
-            setInterval(() => reg.update(), 3600000);
-            reg.addEventListener('updatefound', () => {
-              const newWorker = reg.installing;
-              newWorker?.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  setShowUpdateNotification(true);
-                }
+          navigator.serviceWorker.register('/apb-admin/a-sw.js')
+            .then((registration) => {
+              console.log('SW registered:', registration);
+              setInterval(() => {
+                registration.update();
+              }, 60 * 60 * 1000);
+              registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                console.log('New service worker found');
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    setShowUpdateNotification(true);
+                  }
+                });
               });
-            });
-          }).catch(err => console.log('SW error:', err));
+            })
+            .catch(err => console.log('SW registration failed:', err));
         }
       }, []);
 
-      // Генерация ID устройства      React.useEffect(() => {
+      React.useEffect(() => {
         let deviceId = localStorage.getItem('admin_device_id');
         if (!deviceId) {
           deviceId = 'admin_' + Math.random().toString(36).substr(2, 12) + Date.now();
@@ -252,413 +258,640 @@
         setAdminDeviceId(deviceId);
       }, []);
 
-      // Push-уведомления в foreground
       React.useEffect(() => {
         const unsubscribe = onMessage(messaging, (payload) => {
-          let text = payload.notification?.body || payload.data?.body || '';
-          if (payload.data?.judgeName && payload.data?.participantNumbers) {
-            text = `${payload.data.judgeName} оценил участника №${payload.data.participantNumbers}`;
+          console.log('Message received in foreground:', payload);
+          let text = '';
+          if (payload.notification) {
+            text = payload.notification.body;
+          } else if (payload.data) {
+            const { judgeName, participantNumbers, discipline } = payload.data;
+            if (judgeName && participantNumbers) {
+              text = `${judgeName} оценил участника №${participantNumbers} в номинации ${discipline}`;
+            }
           }
-          if (text) showEvent(text);
+          if (text) {
+            showEvent(text);
+          }
         });
         return () => unsubscribe();
-      }, [showEvent]);
+      }, []);
 
-      // Подписка на Firebase (оптимизировано)
       React.useEffect(() => {
         let mounted = true;
-        const q = query(collection(db, 'evaluations'), orderBy('createdAt', 'desc'), limit(100));
-        
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        const evaluationsQuery = query(
+          collection(db, 'evaluations'),
+          orderBy('createdAt', 'desc'),
+          limit(100)
+        );
+        const unsubscribe = onSnapshot(evaluationsQuery, (snapshot) => {
           if (!mounted) return;
-          const evaluations = snapshot.docs.map(doc => ({ firestoreId: doc.id, ...doc.data() }));
-          
-          // Показываем событие только для новых записей
-          if (data.length > 0) {
-            const newEvals = evaluations.filter(newItem => !data.some(old => old.firestoreId === newItem.firestoreId));
+          const evaluations = snapshot.docs.map(doc => ({
+            firestoreId: doc.id,
+            ...doc.data()
+          }));
+          console.log('🔥 Получены оценки:', evaluations.length);
+          if (data.length === 0 && evaluations.length > 0) {
+            const latest = evaluations[0];
+            const judge = latest.judgeName || 'Судья';
+            const participantNumbers = latest.participants?.map(p => p.number).join(', ') || '—';
+            const text = `${judge} оценил участника №${participantNumbers} в номинации ${latest.discipline || '—'}`;
+            showEvent(text);
+          } else if (data.length > 0) {
+            const newEvals = evaluations.filter(newItem =>
+              !data.some(oldItem => oldItem.firestoreId === newItem.firestoreId)
+            );
             newEvals.forEach(item => {
-              const text = `${item.judgeName || 'Судья'} оценил участника №${item.participants?.map(p=>p.number).join(',')||'—'}`;
+              const judge = item.judgeName || 'Судья';
+              const participantNumbers = item.participants?.map(p => p.number).join(', ') || '—';
+              const text = `${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`;
               showEvent(text);
             });
           }
-          
-          // Автовыбор последней даты
-          if (evaluations.length > 0 && evaluations[0].createdAt) {
-            const d = evaluations[0].createdAt.toDate();
-            setSelectedDate({ month: d.getMonth(), year: d.getFullYear() });
-            setSelectedDay(d.getDate());
+          if (evaluations.length > 0) {
+            const latest = evaluations[0];
+            if (latest.createdAt) {
+              const lastDate = latest.createdAt.toDate();
+              setSelectedDate({ month: lastDate.getMonth(), year: lastDate.getFullYear() });
+              setSelectedDay(lastDate.getDate());
+            }
           }
-          
           setData(evaluations);
-          requestAnimationFrame(() => { if (mounted) setLoading(false); });
-        }, (err) => { console.error('Firebase error:', err); if (mounted) setLoading(false); });
-        return () => { mounted = false; unsubscribe(); };
-      }, []); // Пустой массив зависимостей - выполняется один раз
+          setTimeout(() => {
+            if (mounted) {
+              setLoading(false);
+            }
+          }, 100);
+        }, (error) => {
+          console.error("❌ Snapshot error:", error);
+          if (mounted) {
+            setLoading(false);
+          }
+        });
+        return () => {
+          mounted = false;
+          unsubscribe();
+        };
+      }, []);
 
-      // Прокрутка вниз
       React.useEffect(() => {
-        if (scrollRef.current && !loading) {
+        if (scrollRef.current) {
           scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
-      }, [data, selectedCity, selectedDate, selectedDay, loading]);
+      }, [data, selectedCity, selectedDate, selectedDay]);
 
-      // Обновление иконок
       React.useEffect(() => {
-        const t = setTimeout(() => { if (window.lucide) lucide.createIcons(); }, 50);
-        return () => clearTimeout(t);
+        if (window.lucide) {
+          lucide.createIcons();
+        }
       });
 
-      // ========== ОПТИМИЗИРОВАННЫЕ ВЫЧИСЛЕНИЯ (useMemo) ==========
-      
-      const filteredByDate = React.useMemo(() => {
+      const getFilteredByDate = () => {
         return data.filter(item => {
           if (!item.createdAt) return false;
-          const d = item.createdAt.toDate();
-          return d.getMonth() === selectedDate.month && d.getFullYear() === selectedDate.year && (selectedDay === null || d.getDate() === selectedDay);
+          const date = item.createdAt.toDate();
+          if (date.getMonth() !== selectedDate.month || date.getFullYear() !== selectedDate.year) return false;
+          if (selectedDay !== null && date.getDate() !== selectedDay) return false;
+          return true;
         });
-      }, [data, selectedDate, selectedDay]);
+      };
 
-      const flatList = React.useMemo(() => {
+      const getFlatList = () => {
         const list = [];
-        filteredByDate.forEach(item => {
-          if (item.participants?.length) {
-            item.participants.forEach((p, idx) => {
+        const filteredData = getFilteredByDate();
+        filteredData.forEach(item => {
+          if (item.participants && Array.isArray(item.participants)) {
+            item.participants.forEach((p, pIdx) => {
               list.push({
-                firestoreId: item.firestoreId, participantIdx: idx,
-                number: p.number || '00', score: Number(p.score) || 0,
-                judge: item.judgeName || '—', city: item.city || '—',
-                comment: p.comment || '', photos: p.photos || [],
-                discipline: item.discipline || '—', createdAt: item.createdAt
+                firestoreId: item.firestoreId,
+                participantIdx: pIdx,
+                number: p.number || '00',
+                score: Number(p.score) || 0,
+                judge: item.judgeName || '—',
+                city: item.city || '—',
+                comment: p.comment || '',
+                photos: p.photos || [],
+                discipline: item.discipline || '—',
+                createdAt: item.createdAt
               });
             });
           }
         });
-        return list.sort((a,b) => (a.createdAt?.toDate()?.getTime()||0) - (b.createdAt?.toDate()?.getTime()||0));
-      }, [filteredByDate]);
+        list.sort((a, b) => {
+          const timeA = a.createdAt ? a.createdAt.toDate().getTime() : 0;
+          const timeB = b.createdAt ? b.createdAt.toDate().getTime() : 0;
+          return timeA - timeB;
+        });
+        return list;
+      };
 
-      const aggregated = React.useMemo(() => {
+      const getAggregatedRanked = () => {
+        const filteredData = getFilteredByDate();
         const groups = {};
-        filteredByDate.forEach(item => {
-          if (item.participants?.length) {
+        filteredData.forEach(item => {
+          if (item.participants && Array.isArray(item.participants)) {
             item.participants.forEach(p => {
-              const date = item.createdAt?.toDate() || new Date();              const key = `${p.number}|${item.discipline}|${item.city}|${date.toDateString()}`;
+              const date = item.createdAt ? item.createdAt.toDate() : new Date();
+              const key = `${p.number}|${item.discipline}|${item.city}|${date.toDateString()}`;
               if (!groups[key]) {
-                groups[key] = { number: p.number, discipline: item.discipline, city: item.city, date, scores: [], comments: [], photos: [], judges: [] };
+                groups[key] = {
+                  number: p.number,
+                  discipline: item.discipline,
+                  city: item.city,
+                  date: date,
+                  scores: [],
+                  comments: [],
+                  photos: [],
+                  judges: [],
+                  firestoreIds: []
+                };
               }
-              groups[key].scores.push(Number(p.score)||0);
+              groups[key].scores.push(Number(p.score) || 0);
               if (p.comment) groups[key].comments.push({ judge: item.judgeName, text: p.comment });
               if (p.photos) groups[key].photos.push(...p.photos);
               if (item.judgeName) groups[key].judges.push(item.judgeName);
+              groups[key].firestoreIds.push(item.firestoreId);
             });
           }
         });
-        return Object.values(groups).map(g => ({
-          ...g, avgScore: g.scores.reduce((a,b)=>a+b,0)/g.scores.length,
-          allComments: g.comments, allPhotos: [...new Set(g.photos)]
-        })).sort((a,b) => b.avgScore - a.avgScore);
-      }, [filteredByDate]);
+        const aggregated = Object.values(groups).map(g => ({
+          ...g,
+          avgScore: g.scores.reduce((a, b) => a + b, 0) / g.scores.length,
+          allComments: g.comments,
+          allPhotos: [...new Set(g.photos)]
+        }));
+        return aggregated.sort((a, b) => b.avgScore - a.avgScore);
+      };
 
-      const cities = React.useMemo(() => ['Все города', ...new Set(flatList.map(e => e.city))], [flatList]);
-      const filteredLive = React.useMemo(() => selectedCity === 'Все города' ? flatList : flatList.filter(e => e.city === selectedCity), [flatList, selectedCity]);
-      
-      const nominationGroups = React.useMemo(() => {
-        const filtered = selectedCity === 'Все города' ? aggregated : aggregated.filter(g => g.city === selectedCity);
+      const allEntriesRaw = getFlatList();
+      const aggregatedRanked = getAggregatedRanked();
+      const cities = ['Все города', ...new Set(allEntriesRaw.map(e => e.city))];
+      const filteredLiveEntries = selectedCity === 'Все города' 
+        ? allEntriesRaw 
+        : allEntriesRaw.filter(e => e.city === selectedCity);
+
+      const getNominationGroups = () => {
+        const filteredAggregated = selectedCity === 'Все города' 
+          ? aggregatedRanked 
+          : aggregatedRanked.filter(g => g.city === selectedCity);
         const groups = {};
-        filtered.forEach(g => { if (!groups[g.discipline]) groups[g.discipline] = []; groups[g.discipline].push(g); });
-        Object.keys(groups).forEach(k => groups[k].sort((a,b)=>b.avgScore-a.avgScore));
+        filteredAggregated.forEach(g => {
+          if (!groups[g.discipline]) groups[g.discipline] = [];
+          groups[g.discipline].push(g);
+        });
+        Object.keys(groups).forEach(key => {
+          groups[key].sort((a, b) => b.avgScore - a.avgScore);
+        });
         return groups;
-      }, [aggregated, selectedCity]);
+      };
 
-      const daysWithData = React.useMemo(() => {
+      const getDaysWithData = () => {
         const days = new Set();
         data.forEach(item => {
           if (!item.createdAt) return;
-          const d = item.createdAt.toDate();
-          if (d.getMonth() === selectedDate.month && d.getFullYear() === selectedDate.year) days.add(d.getDate());
+          const date = item.createdAt.toDate();
+          if (date.getMonth() === selectedDate.month && date.getFullYear() === selectedDate.year) {
+            days.add(date.getDate());
+          }
         });
-        return Array.from(days).sort((a,b)=>a-b);
-      }, [data, selectedDate]);
+        return Array.from(days).sort((a, b) => a - b);
+      };
 
-      // ========== ДРУГИЕ ФУНКЦИИ ==========
-      
-      const analyzeComments = React.useCallback(async (target, mode) => {
-        setIsAnalyzing(true); setAiAnalysis(""); setErrorInfo(null);
-        let text = '';
+      const analyzeComments = async (target, mode) => {
+        setIsAnalyzing(true);
+        setAiAnalysis("");
+        setErrorInfo(null);
+
+        let commentsText = '';
         if (mode === 'single') {
-          const rec = flatList.find(e => e.firestoreId === target.firestoreId && e.participantIdx === target.participantIdx);
-          if (rec?.comment) text = `Судья ${rec.judge}: "${rec.comment}"`;
+          const { firestoreId, participantIdx } = target;
+          const record = allEntriesRaw.find(e => e.firestoreId === firestoreId && e.participantIdx === participantIdx);
+          if (record && record.comment.trim()) {
+            commentsText = `Судья ${record.judge}: "${record.comment}"`;
+          }
         } else {
-          const dateStr = new Date(target.date).toDateString();
-          text = flatList.filter(e => e.number===target.number && e.discipline===target.discipline && e.city===target.city && new Date(e.createdAt.toDate()).toDateString()===dateStr && e.comment)
-            .map(e => `Судья ${e.judge}: "${e.comment}"`).join("\n");        }
-        if (!text) { setAiAnalysis("Нет отзывов для анализа"); setIsAnalyzing(false); return; }
+          const { number, discipline, city, date } = target;
+          const targetDate = new Date(date).toDateString();
+          const comments = allEntriesRaw
+            .filter(e => 
+              e.number === number && 
+              e.discipline === discipline && 
+              e.city === city &&
+              new Date(e.createdAt.toDate()).toDateString() === targetDate &&
+              e.comment.trim().length > 0
+            )
+            .map(e => `Судья ${e.judge}: "${e.comment}"`)
+            .join("\n");
+          commentsText = comments;
+        }
+
+        if (!commentsText) {
+          setAiAnalysis("Недостаточно отзывов для анализа.");
+          setIsAnalyzing(false);
+          return;
+        }
+
         try {
-          const res = await fetch("https://functions.yandexcloud.net/d4ej8k6scmj9evo4us4n", {
-            method: "POST", headers: {"Content-Type":"application/json"},
-            body: JSON.stringify({ completionOptions:{stream:false,temperature:0.6,maxTokens:"2000"}, messages:[
-              {role:"system",text:"Ты эксперт-аналитик конкурса по брейдингу. Пиши кратко и профессионально."},
-              {role:"user",text:`Проанализируй отзывы:\n${text}`}
-            ]})
+          const PROXY_URL = "https://functions.yandexcloud.net/d4ej8k6scmj9evo4us4n";
+          const response = await fetch(PROXY_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              completionOptions: { stream: false, temperature: 0.6, maxTokens: "2000" },
+              messages: [
+                { role: "system", text: "Ты эксперт-аналитик конкурса по брейдингу (плетение кос, дреды, брейды, изготовление комплектов для вплета). Пиши профессионально и вежливо, давай краткие резюме (2-3 предложения)." },
+                { role: "user", text: `Проанализируй отзывы судей:\n\n${commentsText}` }
+              ]
+            })
           });
-          if (!res.ok) throw new Error('HTTP '+res.status);
-          const result = await res.json();
-          setAiAnalysis(result.result?.alternatives?.[0]?.message?.text || "Анализ не удался");
-        } catch { setErrorInfo("Ошибка запроса"); }
-        finally { setIsAnalyzing(false); }
-      }, [flatList]);
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error ${response.status}: ${errorText}`);
+          }
+          const result = await response.json();
+          const generatedText = result.result?.alternatives?.[0]?.message?.text || "Анализ не удался.";
+          setAiAnalysis(generatedText);
+        } catch (error) {
+          console.error("YandexGPT proxy error:", error);
+          setErrorInfo("Ошибка при запросе к YandexGPT.");
+        } finally {
+          setIsAnalyzing(false);
+        }
+      };
 
-      const openFromStream = React.useCallback((item) => {
-        setModalMedia({ type:'single', firestoreId:item.firestoreId, participantIdx:item.participantIdx, number:item.number, discipline:item.discipline, city:item.city, timestamp:item.createdAt.toDate().toISOString(), photos:item.photos, judge:item.judge, comment:item.comment });
+      const openFromStream = (item) => {
+        setModalMedia({
+          type: 'single',
+          firestoreId: item.firestoreId,
+          participantIdx: item.participantIdx,
+          number: item.number,
+          discipline: item.discipline,
+          city: item.city,
+          timestamp: item.createdAt.toDate().toISOString(),
+          photos: item.photos,
+          judge: item.judge,
+          comment: item.comment
+        });
         analyzeComments(item, 'single');
-      }, [analyzeComments]);
+      };
 
-      const openFromAggregated = React.useCallback((group) => {
-        setModalMedia({ type:'group', number:group.number, discipline:group.discipline, city:group.city, timestamp:group.date, photos:group.allPhotos, comments:group.allComments });
+      const openFromAggregated = (group) => {
+        setModalMedia({
+          type: 'group',
+          number: group.number,
+          discipline: group.discipline,
+          city: group.city,
+          timestamp: group.date,
+          photos: group.allPhotos,
+          comments: group.allComments
+        });
         analyzeComments(group, 'group');
-      }, [analyzeComments]);
+      };
 
-      const copyReport = React.useCallback(() => {
+      const copyReportToClipboard = () => {
         if (!modalMedia) return;
-        const comments = modalMedia.type==='single' ? `• ${modalMedia.judge}: "${modalMedia.comment}"` : modalMedia.comments.map(c=>`• ${c.judge}: "${c.text}"`).join("\n");
-        const report = `Участник №${modalMedia.number}\nНоминация: ${modalMedia.discipline}\nГород: ${modalMedia.city}\nДата: ${new Date(modalMedia.timestamp).toLocaleDateString()}\n\nAI Анализ:\n${aiAnalysis||"Нет"}\n\nКомментарии:\n${comments||"Нет"}`;
-        navigator.clipboard.writeText(report).then(()=>alert("Скопировано")).catch(()=>alert("Ошибка"));
-      }, [modalMedia, aiAnalysis]);
+        let commentsList = '';
+        if (modalMedia.type === 'single') {
+          commentsList = `• ${modalMedia.judge}: "${modalMedia.comment}"`;
+        } else {
+          commentsList = modalMedia.comments.map(c => `• ${c.judge}: "${c.text}"`).join("\n");
+        }
+        const reportText = `Участник №${modalMedia.number}\nНоминация: ${modalMedia.discipline}\nГород чемпионата: ${modalMedia.city}\nДата: ${new Date(modalMedia.timestamp).toLocaleDateString()}\n\nAI Анализ:\n${aiAnalysis || "Анализ не выполнялся"}\n\nКомментарии судей:\n${commentsList || "Нет комментариев."}`;
+        navigator.clipboard.writeText(reportText).then(() => {
+          alert("Отчёт скопирован в буфер обмена");
+        }).catch(() => {
+          alert("Не удалось скопировать");
+        });
+      };
 
-      const changeMonth = React.useCallback((dir) => {
+      const changeMonth = (direction) => {
         setSelectedDate(prev => {
-          let m = prev.month + dir, y = prev.year;
-          if (m>11) { m=0; y++; } if (m<0) { m=11; y--; }
-          return { month: m, year: y };
+          let newMonth = prev.month + direction;
+          let newYear = prev.year;
+          if (newMonth > 11) { newMonth = 0; newYear++; }
+          if (newMonth < 0) { newMonth = 11; newYear--; }
+          return { month: newMonth, year: newYear };
         });
         setSelectedDay(null);
-      }, []);
+      };
 
-      const dateDisplay = selectedDay ? `${selectedDay} ${MONTHS[selectedDate.month]} ${selectedDate.year}` : `${MONTHS[selectedDate.month]} ${selectedDate.year}`;
+      const daysWithData = getDaysWithData();
+      const dateDisplay = selectedDay 
+        ? `${selectedDay} ${MONTHS[selectedDate.month]} ${selectedDate.year}`
+        : `${MONTHS[selectedDate.month]} ${selectedDate.year}`;
 
-      // ========== ПРЕЛОАДЕР ==========
-      if (loading) {
-        return createElement('div', { className: 'min-h-screen bg-white flex items-center justify-center' },
-          createElement('div', { className: 'text-center max-w-xs' },
-            createElement('div', { className: 'text-gray-900 font-light text-sm tracking-widest mb-6 animate-pulse' }, 'загрузка данных...'),            createElement('div', { className: 'w-full h-px bg-gray-200 mb-3' },
-              createElement('div', { id: 'preloaderBar', className: 'h-full bg-black transition-all duration-200', style: { width: progress+'%' } })
-            ),
-            createElement('div', { className: 'text-gray-500 text-xs font-light tracking-wider' }, Math.floor(progress)+'%')
-          )
-        );
-      }
+      if (loading) return (
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <div className="preloader-container fade-in-ui">
+            <div className="preloader-text">загрузка данных...</div>
+            <div className="preloader-progress-container">
+              <div className="preloader-progress-bar" style={{ width: progress + '%' }}></div>
+            </div>
+            <div className="preloader-percentage">{Math.floor(progress)}%</div>
+          </div>
+        </div>
+      );
 
-      // ========== ОСНОВНОЙ РЕНДЕР ==========
-      return createElement('div', { className: 'min-h-screen bg-gray-50 text-gray-900 select-none pb-12 ui-ready' },
-        
-        // Баннер установки
-        deferredPrompt && createElement('div', { className: 'bg-black text-white px-4 py-2 flex justify-between items-center text-[10px] sticky top-0 z-50' },
-          createElement('span', null, 'УСТАНОВИТЕ ПРИЛОЖЕНИЕ'),
-          createElement('button', { onClick: handleInstallClick, className: 'bg-white text-black px-3 py-1 rounded-full text-[9px]' }, 'ДОБАВИТЬ')
-        ),
-
-        // Обновление
-        showUpdateNotification && createElement('div', { className: 'bg-black text-white px-4 py-2 flex justify-between items-center text-[10px] sticky top-0 z-50', style: { top: deferredPrompt?'36px':'0' } },
-          createElement('span', null, 'НОВАЯ ВЕРСИЯ'),
-          createElement('button', { onClick: handleUpdateClick, className: 'bg-white text-black px-3 py-1 rounded-full text-[9px]' }, 'ОБНОВИТЬ')
-        ),
-
-        // Шапка с дашбордом
-        createElement('div', { className: 'sticky top-2 z-40 w-full pt-2 pb-4 px-3' },
-          createElement('div', { className: 'max-w-5xl mx-auto flex items-center justify-between' },
-            createElement('div', { className: 'w-8' }),
-            createElement('div', { onClick: handleDashboardClick, className: 'bg-black text-white rounded-full flex items-center overflow-hidden transition-all duration-200 cursor-pointer', style: { maxWidth: currentEvent?'500px':'40px' } },
-              createElement('div', { className: 'p-2 flex-shrink-0' }, createElement('i', { 'data-lucide':'bell', width:'16', height:'16', className:'text-gray-400' })),
-              currentEvent && createElement('div', { className: 'whitespace-nowrap overflow-hidden text-ellipsis mr-3 text-[11px] font-medium event-text' }, currentEvent.text)
-            ),
-            createElement('button', { onClick: ()=>setShowPushSettings(true), className: 'w-8 h-8 bg-black text-white rounded-full flex items-center justify-center' },
-              createElement('i', { 'data-lucide':'settings', width:'16', height:'16' })
-            )
-          )
-        ),
-
-        // Настройки
-        createElement(Settings, { show: showPushSettings, onClose: ()=>setShowPushSettings(false), adminDeviceId }),
-
-        // Основной контент
-        createElement('div', { className: 'max-w-5xl mx-auto px-4 space-y-5 mt-2' },
+      return (
+        <div className="min-h-screen bg-gray-50 font-sans text-gray-900 select-none pb-12">
           
-          // Календарь
-          createElement('div', { className: 'relative', ref: calendarRef },
-            createElement('button', { onClick: ()=>setShowCalendar(!showCalendar), className: 'w-full bg-white rounded-2xl p-3 border border-gray-200 flex items-center justify-between' },
-              createElement('div', { className: 'flex items-center gap-2 text-gray-400' },
-                createElement('i', { 'data-lucide':'calendar', width:'16', height:'16' }),
-                createElement('span', { className: 'text-[9px] uppercase tracking-widest' }, 'Дата:')
-              ),              createElement('div', { className: 'flex items-center gap-2' },
-                createElement('span', { className: 'text-[11px] text-gray-900' }, dateDisplay),
-                createElement('i', { 'data-lucide':'chevron-down', width:'14', height:'14', className: 'text-gray-400 transition-transform'+(showCalendar?' rotate-180':'') })
-              )
-            ),
-            showCalendar && createElement('div', { className: 'absolute left-0 right-0 mt-2 bg-white rounded-2xl border border-gray-200 p-4 z-50' },
-              createElement('div', { className: 'flex items-center justify-between mb-4' },
-                createElement('button', { onClick: ()=>changeMonth(-1), className: 'p-2 hover:bg-gray-100 rounded-lg' }, createElement('i', { 'data-lucide':'chevron-left', width:'18', height:'18' })),
-                createElement('div', { className: 'text-[12px] uppercase' }, MONTHS[selectedDate.month]+' '+selectedDate.year),
-                createElement('button', { onClick: ()=>changeMonth(1), className: 'p-2 hover:bg-gray-100 rounded-lg' }, createElement('i', { 'data-lucide':'chevron-right', width:'18', height:'18' }))
-              ),
-              createElement('div', { className: 'grid grid-cols-7 gap-1 text-center text-[9px] text-gray-400 mb-2' },
-                ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(d=>createElement('div',{key:d},d))
-              ),
-              createElement('div', { className: 'grid grid-cols-7 gap-1' },
-                Array.from({length:42},(_,i)=>{
-                  const date = new Date(selectedDate.year, selectedDate.month, i-2);
-                  const day = date.getDate();
-                  const isCur = date.getMonth()===selectedDate.month;
-                  const has = daysWithData.includes(day) && isCur;
-                  const sel = selectedDay===day && isCur;
-                  return createElement('button', { key:i, disabled:!isCur, onClick:()=>{ if(isCur){setSelectedDay(day);setShowCalendar(false);} }, className: 'aspect-square rounded-lg text-[10px] flex items-center justify-center'+(!isCur?' text-gray-200':' hover:bg-gray-100')+(has?' bg-gray-100 text-gray-900':'')+(sel?' bg-gray-900 text-white':'') }, day);
-                })
-              ),
-              createElement('div', { className: 'flex justify-end mt-3' },
-                createElement('button', { onClick: ()=>{setSelectedDay(null);setShowCalendar(false);}, className: 'text-[10px] text-gray-500 uppercase tracking-wider hover:text-gray-900' }, 'Все дни')
-              )
-            )
-          ),
+          {/* Баннеры установки и обновления */}
+          {deferredPrompt && (
+            <div className="bg-black text-white px-4 py-2 flex justify-between items-center text-[10px] sticky top-0 z-[60]">
+              <span>УСТАНОВИТЕ ПРИЛОЖЕНИЕ НА ГЛАВНЫЙ ЭКРАН</span>
+              <button onClick={handleInstallClick} className="bg-white text-black px-3 py-1 rounded-full text-[9px]">ДОБАВИТЬ</button>
+            </div>
+          )}
+          {showUpdateNotification && (
+            <div className="bg-black text-white px-4 py-2 flex justify-between items-center text-[10px] sticky top-0 z-[60]" style={{ top: deferredPrompt ? '36px' : '0' }}>
+              <span>ДОСТУПНА НОВАЯ ВЕРСИЯ ПРИЛОЖЕНИЯ</span>
+              <button onClick={handleUpdateClick} className="bg-white text-black px-3 py-1 rounded-full text-[9px]">ОБНОВИТЬ</button>
+            </div>
+          )}
 
-          // Поток результатов
-          createElement('div', { className: 'bg-white rounded-[32px] p-6 border border-gray-200 overflow-hidden' },
-            createElement('div', { className: 'flex justify-between items-center mb-5' },
-              createElement('div', { className: 'flex flex-col' },
-                createElement('h2', { className: 'text-[10px] text-gray-400 tracking-[0.15em] uppercase' }, 'Поток результатов'),
-                createElement('span', { className: 'text-[8px] text-gray-300 uppercase mt-1' }, 'Всего: '+flatList.length)
-              ),
-              createElement('div', { className: 'flex items-center gap-2' },
-                createElement('div', { className: 'w-1.5 h-1.5 bg-gray-400 rounded-full' }),
-                createElement('span', { className: 'text-[9px] text-gray-500 tracking-wider' }, 'LIVE')
-              )
-            ),
-            createElement('div', { className: 'overflow-x-auto scrollbar-hide' },
-              createElement('div', { className: 'min-w-[850px]' },
-                createElement('div', { className: 'grid grid-cols-[60px_160px_70px_70px_110px_110px_1fr_60px] text-[8px] text-gray-400 px-4 mb-4 uppercase tracking-widest' },
-                  createElement('div',null,'№'),createElement('div',null,'Номинация'),createElement('div',null,'Балл'),createElement('div',null,'Место'),createElement('div',null,'Судья'),createElement('div',null,'Город'),createElement('div',null,'Комментарий'),createElement('div',{className:'text-right'},'Медиа')
-                ),
-                createElement('div', { ref: scrollRef, className: 'max-h-[300px] overflow-y-auto pr-1 space-y-1.5 scrollbar-hide scroll-smooth' },
-                  filteredLive.length > 0 ? filteredLive.map((item,idx)=>
-                    createElement('div', { key:idx, className: 'grid grid-cols-[60px_160px_70px_70px_110px_110px_1fr_60px] items-center bg-gray-50/40 rounded-2xl px-4 py-3 text-[11px] hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all' },                      createElement('div',{className:'text-gray-900'},'#'+item.number),
-                      createElement('div',{className:'text-gray-900 truncate pr-4'},item.discipline),
-                      createElement('div',{className:'text-gray-900 text-[13px]'},item.score),
-                      createElement('div',{className:'text-gray-400'}),
-                      createElement('div',{className:'truncate pr-4 text-gray-600'},item.judge),
-                      createElement('div',{className:'text-gray-400 truncate pr-4'},item.city),
-                      createElement('div',{className:'text-gray-400 truncate text-[10px] pr-4',title:item.comment||'—'},item.comment||'—'),
-                      createElement('div',{className:'flex justify-end'},
-                        createElement('button',{onClick:()=>openFromStream(item),className:'flex items-center gap-1.5 text-gray-500 p-2 hover:bg-gray-200 rounded-xl transition-all'},
-                          createElement('i',{'data-lucide':'image',width:'14',height:'14'}),
-                          createElement('span',{className:'text-[10px]'},item.photos.length)
+          {/* Липкая верхняя панель с дашбордом и кнопкой настроек */}
+          <div className="sticky top-0 z-40 w-full pt-2 pb-4 px-3 bg-gray-50/80 backdrop-blur-sm">
+            <div className="relative max-w-5xl mx-auto">
+              {/* Кнопка настроек (нижний слой) */}
+              <div className="absolute right-0 top-0 z-10">
+                <button
+                  onClick={() => setShowPushSettings(true)}
+                  className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center"
+                >
+                  <i data-lucide="settings" width="16" height="16" />
+                </button>
+              </div>
+
+              {/* Дашборд (верхний слой) */}
+              <div className="absolute left-1/2 transform -translate-x-1/2 z-20 max-w-[90%] sm:max-w-md">
+                <div
+                  onClick={handleDashboardClick}
+                  className="bg-black text-white rounded-full flex items-center overflow-hidden transition-all duration-300 ease-in-out cursor-pointer"
+                  style={{ maxWidth: currentEvent ? '500px' : '40px' }}
+                >
+                  <div className="p-2 flex-shrink-0">
+                    <i data-lucide="bell" width="16" height="16" className="text-gray-400" />
+                  </div>
+                  {currentEvent && (
+                    <div className="whitespace-nowrap overflow-hidden text-ellipsis py-2 pr-3 text-[11px] font-medium event-text">
+                      {currentEvent.text}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Окно настроек */}
+          <Settings show={showPushSettings} onClose={() => setShowPushSettings(false)} adminDeviceId={adminDeviceId} />
+
+          {/* Основной интерфейс */}
+          <div className="max-w-5xl mx-auto px-4 space-y-5 mt-2">
+            
+            {/* Календарь */}
+            <div className="relative" ref={calendarRef}>
+              <button
+                onClick={() => setShowCalendar(!showCalendar)}
+                className="w-full bg-white rounded-2xl p-3 border border-gray-200 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2 text-gray-400">
+                  <i data-lucide="calendar" width="16" height="16"></i>
+                  <span className="text-[9px] uppercase tracking-widest">Дата:</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-gray-900">{dateDisplay}</span>
+                  <i data-lucide="chevron-down" width="14" height="14" className={`text-gray-400 transition-transform ${showCalendar ? 'rotate-180' : ''}`}></i>
+                </div>
+              </button>
+              {showCalendar && (
+                <div className="absolute left-0 right-0 mt-2 bg-white rounded-2xl border border-gray-200 p-4 z-50">
+                  <div className="flex items-center justify-between mb-4">
+                    <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-gray-100 rounded-lg">
+                      <i data-lucide="chevron-left" width="18" height="18"></i>
+                    </button>
+                    <div className="text-[12px] uppercase">{MONTHS[selectedDate.month]} {selectedDate.year}</div>
+                    <button onClick={() => changeMonth(1)} className="p-2 hover:bg-gray-100 rounded-lg">
+                      <i data-lucide="chevron-right" width="18" height="18"></i>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-7 gap-1 text-center text-[9px] text-gray-400 mb-2">
+                    {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(d=><div key={d}>{d}</div>)}
+                  </div>
+                  <div className="grid grid-cols-7 gap-1">
+                    {Array.from({ length: 42 }, (_, i) => {
+                      const date = new Date(selectedDate.year, selectedDate.month, i-2);
+                      const day = date.getDate();
+                      const isCurrentMonth = date.getMonth() === selectedDate.month;
+                      const hasData = daysWithData.includes(day) && isCurrentMonth;
+                      const isSelected = selectedDay === day && isCurrentMonth;
+                      return (
+                        <button
+                          key={i}
+                          disabled={!isCurrentMonth}
+                          onClick={() => { if (isCurrentMonth) { setSelectedDay(day); setShowCalendar(false); } }}
+                          className={`aspect-square rounded-lg text-[10px] flex items-center justify-center ${!isCurrentMonth ? 'text-gray-200' : 'hover:bg-gray-100'} ${hasData ? 'bg-gray-100 text-gray-900' : ''} ${isSelected ? 'bg-gray-900 text-white' : ''}`}
+                        >{day}</button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-end mt-3">
+                    <button onClick={() => { setSelectedDay(null); setShowCalendar(false); }} className="text-[10px] text-gray-500 uppercase tracking-wider hover:text-gray-900">Все дни</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Поток результатов */}
+            <div className="bg-white rounded-[32px] p-6 border border-gray-200 overflow-hidden">
+              <div className="flex justify-between items-center mb-5">
+                <div className="flex flex-col">
+                  <h2 className="text-[10px] text-gray-400 tracking-[0.15em] uppercase">Поток результатов</h2>
+                  <span className="text-[8px] text-gray-300 uppercase mt-1">Всего: {allEntriesRaw.length}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
+                  <span className="text-[9px] text-gray-500 tracking-wider">LIVE</span>
+                </div>
+              </div>
+              <div className="overflow-x-auto scrollbar-hide">
+                <div className="min-w-[850px]">
+                  <div className="grid grid-cols-[60px_160px_70px_70px_110px_110px_1fr_60px] text-[8px] text-gray-400 px-4 mb-4 uppercase tracking-widest">
+                    <div>№</div><div>Номинация</div><div>Балл</div><div>Место</div><div>Судья</div><div>Город</div><div>Комментарий</div><div className="text-right">Медиа</div>
+                  </div>
+                  <div ref={scrollRef} className="max-h-[300px] overflow-y-auto pr-1 space-y-1.5 scrollbar-hide scroll-smooth">
+                    {filteredLiveEntries.length > 0 ? (
+                      filteredLiveEntries.map((item, idx) => (
+                        <div key={idx} className="grid grid-cols-[60px_160px_70px_70px_110px_110px_1fr_60px] items-center bg-gray-50/40 rounded-2xl px-4 py-3 text-[11px] hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all">
+                          <div className="text-gray-900">#{item.number}</div>
+                          <div className="text-gray-900 truncate pr-4">{item.discipline}</div>
+                          <div className="text-gray-900 text-[13px]">{item.score}</div>
+                          <div className="text-gray-400">{/* место */}</div>
+                          <div className="truncate pr-4 text-gray-600">{item.judge}</div>
+                          <div className="text-gray-400 truncate pr-4">{item.city}</div>
+                          <div className="text-gray-400 truncate text-[10px] pr-4" title={item.comment || "—"}>{item.comment || "—"}</div>
+                          <div className="flex justify-end">
+                            <button onClick={() => openFromStream(item)} className="flex items-center gap-1.5 text-gray-500 p-2 hover:bg-gray-200 rounded-xl transition-all">
+                              <i data-lucide="image" width="14" height="14"></i>
+                              <span className="text-[10px]">{item.photos.length}</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="py-16 text-center text-[10px] text-gray-300 uppercase tracking-[0.2em]">Записей не найдено</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Фильтр по городам */}
+            {cities.length > 1 && (
+              <div className="flex justify-center overflow-hidden">
+                <div className="bg-white rounded-full p-1 border border-gray-200 flex gap-1 overflow-x-auto max-w-full scrollbar-hide">
+                  {cities.map(city => (
+                    <button key={city} onClick={() => setSelectedCity(city)} className={`px-4 py-1.5 rounded-full text-[10px] transition-all whitespace-nowrap uppercase tracking-tighter ${selectedCity === city ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-900'}`}>
+                      {city}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Итоги по номинациям */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {Object.entries(getNominationGroups()).map(([nomination, participants]) => (
+                <div key={nomination} className="bg-white rounded-[32px] p-6 border border-gray-200">
+                  <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-4">
+                    <h4 className="text-[12px] tracking-tight leading-tight uppercase w-3/4">{nomination}</h4>
+                    <span className="text-[9px] text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">N={participants.length}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {participants.map((p, pIdx) => {
+                      const isFirst = pIdx === 0;
+                      return (
+                        <div key={pIdx} className={`flex justify-between items-center px-5 py-4 rounded-[22px] transition-all ${isFirst ? 'bg-gray-100' : 'bg-gray-50/60'}`}>
+                          <div className="flex flex-col">
+                            <span className={`text-[12px] ${isFirst ? 'text-gray-900' : 'text-gray-700'}`}>№ {p.number}</span>
+                            <span className="text-[8px] text-gray-400 uppercase tracking-widest">{p.city}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] tracking-tight">
+                            <i data-lucide="award" width="14" height="14" className={isFirst ? 'text-gray-700' : 'text-gray-300'} />
+                            {pIdx + 1} МЕСТО
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <span className="text-[15px] tracking-tighter">{p.avgScore.toFixed(1)}</span>
+                              <span className="text-[7px] block text-gray-400 uppercase -mt-1">БАЛЛЫ</span>
+                            </div>
+                            <button onClick={() => openFromAggregated(p)} className="p-2 hover:bg-gray-200 rounded-full transition-all">
+                              <i data-lucide="sparkles" width="16" height="16" className={isFirst ? 'text-gray-700' : 'text-gray-400'} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Модальные окна и полноэкранное изображение (без изменений) */}
+          {modalMedia && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => { setModalMedia(null); setAiAnalysis(""); }}>
+              <div className="bg-white w-full max-w-xl rounded-[40px] overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                <div className="p-6 flex justify-between items-center border-b border-gray-200">
+                  <div className="flex flex-col">
+                    <h3 className="text-[10px] uppercase tracking-[0.2em] text-gray-500 mb-1">Медиа-отчет</h3>
+                    <span className="text-[13px] text-gray-900">Участник № {modalMedia.number}</span>
+                    <span className="text-[10px] text-gray-500">{modalMedia.discipline} / {modalMedia.city}</span>
+                    <span className="text-[9px] text-gray-400">{new Date(modalMedia.timestamp).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={copyReportToClipboard} className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-all" title="Копировать отчёт">
+                      <i data-lucide="copy" width="20" height="20"></i>
+                    </button>
+                    <button onClick={() => setModalMedia(null)} className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-all">
+                      <i data-lucide="x" width="20" height="20"></i>
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+                  <div className="bg-gray-50 border border-gray-200 rounded-3xl p-6 min-h-[100px] flex flex-col justify-center">
+                    <div className="flex items-center gap-2 mb-3">
+                      <i data-lucide="sparkles" width="16" height="16" className="text-gray-500"></i>
+                      <span className="text-[10px] text-gray-500 tracking-[0.15em] uppercase">AI Анализ</span>
+                    </div>
+                    {isAnalyzing ? (
+                      <div className="flex items-center gap-3 py-2">
+                        <i data-lucide="loader-2" width="18" height="18" className="text-gray-500 animate-spin"></i>
+                        <span className="text-[12px] text-gray-500 uppercase tracking-widest">Анализируем отзывы...</span>
+                      </div>
+                    ) : (
+                      <p className="text-[13px] leading-relaxed text-gray-700">{aiAnalysis || "Нет текстовых отзывов для генерации анализа."}</p>
+                    )}
+                  </div>
+                  <div className="bg-gray-50 rounded-3xl p-6 border border-gray-200">
+                    <div className="flex items-center gap-2 mb-4">
+                      <i data-lucide="message-square" width="16" height="16" className="text-gray-500"></i>
+                      <span className="text-[10px] text-gray-500 tracking-[0.15em] uppercase">
+                        {modalMedia.type === 'single' ? 'Комментарий судьи' : 'Комментарии судей'}
+                      </span>
+                    </div>
+                    <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                      {modalMedia.type === 'single' ? (
+                        modalMedia.comment && (
+                          <div className="text-[12px] bg-white p-3 rounded-xl border border-gray-100">
+                            <span className="font-medium text-gray-900">{modalMedia.judge}:</span> <span className="text-gray-700">"{modalMedia.comment}"</span>
+                          </div>
                         )
-                      )
-                    )
-                  ) : createElement('div',{className:'py-16 text-center text-[10px] text-gray-300 uppercase tracking-[0.2em]'},'Записей не найдено')
-                )
-              )
-            )
-          ),
+                      ) : (
+                        modalMedia.comments.map((c, idx) => (
+                          <div key={idx} className="text-[12px] bg-white p-3 rounded-xl border border-gray-100">
+                            <span className="font-medium text-gray-900">{c.judge}:</span> <span className="text-gray-700">"{c.text}"</span>
+                          </div>
+                        ))
+                      )}
+                      {((modalMedia.type === 'single' && !modalMedia.comment) || (modalMedia.type === 'group' && modalMedia.comments.length === 0)) && (
+                        <div className="text-gray-400 text-[12px] italic">Нет комментариев</div>
+                      )}
+                    </div>
+                  </div>
+                  {modalMedia.type === 'single' && modalMedia.photos && modalMedia.photos.length > 0 && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {modalMedia.photos.map((url, i) => (
+                        <div key={i} className="group relative aspect-[4/5] bg-gray-100 rounded-[28px] overflow-hidden border border-gray-200 cursor-pointer" onClick={() => setFullscreenImage({ url, index: i })}>
+                          <img src={url} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                          <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <i data-lucide="maximize-2" width="32" height="32" className="text-white"></i>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
-          // Фильтр городов
-          cities.length > 1 && createElement('div', { className: 'flex justify-center overflow-hidden' },
-            createElement('div', { className: 'bg-white rounded-full p-1 border border-gray-200 flex gap-1 overflow-x-auto max-w-full scrollbar-hide' },
-              cities.map(city => createElement('button', { key:city, onClick:()=>setSelectedCity(city), className: 'px-4 py-1.5 rounded-full text-[10px] transition-all whitespace-nowrap uppercase tracking-tighter'+(selectedCity===city?' bg-gray-900 text-white':' text-gray-400 hover:text-gray-900') }, city))
-            )
-          ),
-
-          // Итоги по номинациям
-          createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-5' },
-            Object.entries(nominationGroups).map(([nom, parts])=>
-              createElement('div', { key:nom, className: 'bg-white rounded-[32px] p-6 border border-gray-200' },
-                createElement('div', { className: 'mb-4 flex items-center justify-between border-b border-gray-100 pb-4' },
-                  createElement('h4', { className: 'text-[12px] tracking-tight leading-tight uppercase w-3/4' }, nom),
-                  createElement('span', { className: 'text-[9px] text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full' }, 'N='+parts.length)
-                ),
-                createElement('div', { className: 'space-y-2' },
-                  parts.map((p,pIdx)=>{
-                    const first = pIdx===0;
-                    return createElement('div', { key:pIdx, className: 'flex justify-between items-center px-5 py-4 rounded-[22px] transition-all'+(first?' bg-gray-100':' bg-gray-50/60') },
-                      createElement('div', { className: 'flex flex-col' },
-                        createElement('span', { className: 'text-[12px]'+(first?' text-gray-900':' text-gray-700') }, '№ '+p.number),
-                        createElement('span', { className: 'text-[8px] text-gray-400 uppercase tracking-widest' }, p.city)
-                      ),
-                      createElement('div', { className: 'flex items-center gap-2 text-[11px] tracking-tight' },
-                        createElement('i', { 'data-lucide':'award', width:'14', height:'14', className: first?'text-gray-700':'text-gray-300' }),
-                        createElement('span', null, (pIdx+1)+' МЕСТО')
-                      ),
-                      createElement('div', { className: 'flex items-center gap-3' },
-                        createElement('div', { className: 'text-right' },
-                          createElement('span', { className: 'text-[15px] tracking-tighter' }, p.avgScore.toFixed(1)),                          createElement('span', { className: 'text-[7px] block text-gray-400 uppercase -mt-1' }, 'БАЛЛЫ')
-                        ),
-                        createElement('button', { onClick:()=>openFromAggregated(p), className: 'p-2 hover:bg-gray-200 rounded-full transition-all' },
-                          createElement('i', { 'data-lucide':'sparkles', width:'16', height:'16', className: first?'text-gray-700':'text-gray-400' })
-                        )
-                      )
-                    );
-                  })
-                )
-              )
-            )
-          )
-        ),
-
-        // Модальное окно
-        modalMedia && createElement('div', { className: 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80', onClick: ()=>{setModalMedia(null);setAiAnalysis('');} },
-          createElement('div', { className: 'bg-white w-full max-w-xl rounded-[40px] overflow-hidden flex flex-col max-h-[90vh]', onClick: e=>e.stopPropagation() },
-            createElement('div', { className: 'p-6 flex justify-between items-center border-b border-gray-200' },
-              createElement('div', { className: 'flex flex-col' },
-                createElement('h3', { className: 'text-[10px] uppercase tracking-[0.2em] text-gray-500 mb-1' }, 'Медиа-отчет'),
-                createElement('span', { className: 'text-[13px] text-gray-900' }, 'Участник № '+modalMedia.number),
-                createElement('span', { className: 'text-[10px] text-gray-500' }, modalMedia.discipline+' / '+modalMedia.city),
-                createElement('span', { className: 'text-[9px] text-gray-400' }, new Date(modalMedia.timestamp).toLocaleDateString())
-              ),
-              createElement('div', { className: 'flex gap-2' },
-                createElement('button', { onClick: copyReport, className: 'p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-all', title: 'Копировать' }, createElement('i', { 'data-lucide':'copy', width:'20', height:'20' })),
-                createElement('button', { onClick: ()=>setModalMedia(null), className: 'p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-all' }, createElement('i', { 'data-lucide':'x', width:'20', height:'20' }))
-              )
-            ),
-            createElement('div', { className: 'flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide' },
-              // AI анализ
-              createElement('div', { className: 'bg-gray-50 border border-gray-200 rounded-3xl p-6 min-h-[100px] flex flex-col justify-center' },
-                createElement('div', { className: 'flex items-center gap-2 mb-3' },
-                  createElement('i', { 'data-lucide':'sparkles', width:'16', height:'16', className:'text-gray-500' }),
-                  createElement('span', { className: 'text-[10px] text-gray-500 tracking-[0.15em] uppercase' }, 'AI Анализ')
-                ),
-                isAnalyzing ? createElement('div', { className: 'flex items-center gap-3 py-2' },
-                  createElement('i', { 'data-lucide':'loader-2', width:'18', height:'18', className:'text-gray-500 animate-spin' }),
-                  createElement('span', { className: 'text-[12px] text-gray-500 uppercase tracking-widest' }, 'Анализируем...')
-                ) : createElement('p', { className: 'text-[13px] leading-relaxed text-gray-700' }, aiAnalysis || "Нет отзывов для анализа")
-              ),
-              // Комментарии
-              createElement('div', { className: 'bg-gray-50 rounded-3xl p-6 border border-gray-200' },
-                createElement('div', { className: 'flex items-center gap-2 mb-4' },
-                  createElement('i', { 'data-lucide':'message-square', width:'16', height:'16', className:'text-gray-500' }),
-                  createElement('span', { className: 'text-[10px] text-gray-500 tracking-[0.15em] uppercase' }, modalMedia.type==='single'?'Комментарий судьи':'Комментарии судей')
-                ),
-                createElement('div', { className: 'space-y-3 max-h-60 overflow-y-auto pr-2' },
-                  modalMedia.type==='single' ? (modalMedia.comment ? createElement('div', { className: 'text-[12px] bg-white p-3 rounded-xl border border-gray-100' }, createElement('span',{className:'font-medium text-gray-900'},modalMedia.judge+':'),' ',createElement('span',{className:'text-gray-700'},'"'+modalMedia.comment+'"')) : createElement('div',{className:'text-gray-400 text-[12px] italic'},'Нет комментариев')) : (modalMedia.comments.length>0 ? modalMedia.comments.map((c,idx)=>createElement('div',{key:idx,className:'text-[12px] bg-white p-3 rounded-xl border border-gray-100'},createElement('span',{className:'font-medium text-gray-900'},c.judge+':'),' ',createElement('span',{className:'text-gray-700'},'"'+c.text+'"'))) : createElement('div',{className:'text-gray-400 text-[12px] italic'},'Нет комментариев'))
-                )              ),
-              // Фото (только single)
-              modalMedia.type==='single' && modalMedia.photos?.length>0 && createElement('div', { className: 'grid grid-cols-2 gap-4' },
-                modalMedia.photos.map((url,i)=>createElement('div', { key:i, className: 'group relative aspect-[4/5] bg-gray-100 rounded-[28px] overflow-hidden border border-gray-200 cursor-pointer', onClick: ()=>setFullscreenImage({url,index:i}) },
-                  createElement('img', { src:url, alt:'', className: 'w-full h-full object-cover transition-transform duration-300 group-hover:scale-105' }),
-                  createElement('div', { className: 'absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center' }, createElement('i', { 'data-lucide':'maximize-2', width:'32', height:'32', className:'text-white' }))
-                ))
-              )
-            )
-          )
-        ),
-
-        // Полноэкранное фото
-        fullscreenImage && createElement('div', { className: 'fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-6', onClick: ()=>setFullscreenImage(null) },
-          createElement('button', { className: 'absolute top-8 right-8 text-white p-2', onClick: ()=>setFullscreenImage(null) }, createElement('i', { 'data-lucide':'x', width:'32', height:'32' })),
-          createElement('img', { src: fullscreenImage.url, className: 'max-w-full max-h-full object-contain', alt: 'View' }),
-          createElement('div', { className: 'absolute bottom-10 px-8 py-3 bg-white/10 rounded-full text-white/80 text-[10px] tracking-widest uppercase' }, 'Фото '+(fullscreenImage.index+1)+' / '+(modalMedia?.photos?.length||0))
-        )
+          {fullscreenImage && (
+            <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-6" onClick={() => setFullscreenImage(null)}>
+              <button className="absolute top-8 right-8 text-white p-2" onClick={() => setFullscreenImage(null)}>
+                <i data-lucide="x" width="32" height="32"></i>
+              </button>
+              <img src={fullscreenImage.url} className="max-w-full max-h-full object-contain" alt="View" />
+              <div className="absolute bottom-10 px-8 py-3 bg-white/10 rounded-full text-white/80 text-[10px] tracking-widest uppercase">
+                Фото {fullscreenImage.index + 1} / {modalMedia?.photos?.length || 0}
+              </div>
+            </div>
+          )}
+        </div>
       );
     }
 
-    // Рендеринг
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(createElement(App));
+    root.render(<App />);
   </script>
 </body>
 </html>
