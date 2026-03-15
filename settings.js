@@ -6,20 +6,15 @@ export function Settings({ show, onClose, adminDeviceId }) {
     const saved = localStorage.getItem('pushEnabled');
     return saved === null ? true : saved === 'true';
   });
-  
+
   const [judges, setJudges] = React.useState([]);
   const [loadingJudges, setLoadingJudges] = React.useState(false);
   const [generating, setGenerating] = React.useState(false);
-  const [toast, setToast] = React.useState(null);
-  const [lastLoaded, setLastLoaded] = React.useState(0);
+  const [toast, setToast] = React.useState(null); // { message, type }
 
-  // Кэширование: загружаем судей только если прошло больше 30 секунд или список пуст
   React.useEffect(() => {
     if (show) {
-      const now = Date.now();
-      if (judges.length === 0 || now - lastLoaded > 30000) {
-        loadJudges();
-      }
+      loadJudges();
     }
   }, [show]);
 
@@ -28,7 +23,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
     try {
       const judgesList = await getJudges();
       setJudges(judgesList);
-      setLastLoaded(Date.now());
     } catch (err) {
       console.error('Ошибка загрузки ключей:', err);
       showToast('Ошибка загрузки ключей', 'error');
@@ -39,15 +33,16 @@ export function Settings({ show, onClose, adminDeviceId }) {
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 2000);
   };
 
   const handleDeviceToggle = async (judgeKey, currentDeviceId, checked) => {
     if (!checked) {
       try {
         await updateJudgeDevice(judgeKey, null);
-        setJudges(prev => prev.map(j =>
-          j.key === judgeKey ? { ...j, deviceId: null } : j        ));
+        setJudges(prev => prev.map(j => 
+          j.key === judgeKey ? { ...j, deviceId: null } : j
+        ));
         showToast('Устройство отвязано');
       } catch (err) {
         console.error('Ошибка отвязки устройства:', err);
@@ -94,9 +89,9 @@ export function Settings({ show, onClose, adminDeviceId }) {
     }
   };
 
-  // Оптимизированный эффект для Push-уведомлений
   React.useEffect(() => {
-    if (!adminDeviceId || !show) return;    
+    if (!adminDeviceId) return;
+
     const handlePushToggle = async () => {
       if (pushEnabled) {
         try {
@@ -112,29 +107,33 @@ export function Settings({ show, onClose, adminDeviceId }) {
             });
             if (token) {
               await saveFcmToken(adminDeviceId, token, navigator.userAgent);
+              showToast('Push-уведомления включены');
             }
           }
         } catch (err) {
           console.error('Error enabling push:', err);
+          showToast('Ошибка включения push', 'error');
         }
       } else {
         try {
           await removeFcmToken(adminDeviceId);
+          showToast('Push-уведомления отключены');
         } catch (err) {
           console.error('Error disabling push:', err);
+          showToast('Ошибка отключения push', 'error');
         }
       }
     };
 
     handlePushToggle();
-  }, [pushEnabled, adminDeviceId, show]);
+  }, [pushEnabled, adminDeviceId]);
 
   if (!show) return null;
 
   return React.createElement(
     'div',
     {
-      className: 'fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm',
+      className: 'fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80',
       onClick: onClose
     },
     React.createElement(
@@ -145,18 +144,20 @@ export function Settings({ show, onClose, adminDeviceId }) {
       },
       // Заголовок
       React.createElement(
-        'div',        { className: 'flex justify-between items-center sticky top-0 bg-white pb-4 border-b border-gray-100' },
+        'div',
+        { className: 'flex justify-between items-center sticky top-0 bg-white pb-4 border-b border-gray-100' },
         React.createElement('h2', { className: 'text-xl font-light tracking-tight' }, 'Настройки'),
         React.createElement(
           'button',
-          { onClick: onClose, className: 'text-gray-400 hover:text-black transition' },
+          { onClick: onClose, className: 'text-gray-400' },
           React.createElement('i', { 'data-lucide': 'x', width: '24', height: '24' })
         )
       ),
+      
       // Блок push-уведомлений
       React.createElement(
         'div',
-        { className: 'space-y-4' },
+        { className: 'space-y-6' },
         React.createElement(
           'div',
           { className: 'flex items-center justify-between' },
@@ -194,7 +195,8 @@ export function Settings({ show, onClose, adminDeviceId }) {
         React.createElement('h3', { className: 'text-[11px] font-medium uppercase tracking-widest text-gray-500' }, 'Управление ключами судей'),
         
         React.createElement(
-          'div',          { className: 'overflow-x-auto' },
+          'div',
+          { className: 'overflow-x-auto' },
           loadingJudges
             ? React.createElement(
                 'div',
@@ -230,8 +232,8 @@ export function Settings({ show, onClose, adminDeviceId }) {
                     : judges.map((judge) =>
                         React.createElement(
                           'tr',
-                          { key: judge.key, className: 'hover:bg-gray-50 transition' },
-                          React.createElement('td', { className: 'px-4 py-3 font-mono text-[10px]' },
+                          { key: judge.key, className: 'hover:bg-gray-50' },
+                          React.createElement('td', { className: 'px-4 py-3 font-mono text-[10px]' }, 
                             React.createElement(
                               'div',
                               { className: 'flex items-center gap-1' },
@@ -240,10 +242,11 @@ export function Settings({ show, onClose, adminDeviceId }) {
                                 'button',
                                 {
                                   onClick: () => handleCopyKey(judge.key),
-                                  className: 'text-gray-400 hover:text-black transition',
+                                  className: 'text-gray-400 hover:text-black',
                                   title: 'Копировать ключ'
                                 },
-                                React.createElement('i', { 'data-lucide': 'copy', width: '14', height: '14' })                              )
+                                React.createElement('i', { 'data-lucide': 'copy', width: '14', height: '14' })
+                              )
                             )
                           ),
                           React.createElement('td', { className: 'px-4 py-3' }, judge.displayName || '—'),
@@ -272,7 +275,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
                               'button',
                               {
                                 onClick: () => handleDeleteKey(judge.key),
-                                className: 'text-red-400 hover:text-red-600 transition',
+                                className: 'text-red-400 hover:text-red-600',
                                 title: 'Удалить ключ'
                               },
                               React.createElement('i', { 'data-lucide': 'trash-2', width: '16', height: '16' })
@@ -292,17 +295,18 @@ export function Settings({ show, onClose, adminDeviceId }) {
             {
               onClick: handleGenerateKey,
               disabled: generating,
-              className: 'bg-black text-white px-4 py-2 rounded-full text-[10px] font-medium uppercase tracking-wider hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition'            },
+              className: 'bg-black text-white px-4 py-2 rounded-full text-[10px] font-medium uppercase tracking-wider hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed'
+            },
             generating ? 'Генерация...' : 'Сгенерировать ключ'
           )
         )
       ),
 
-      // Toast-уведомление (исправлено позиционирование)
+      // Toast-уведомление
       toast && React.createElement(
         'div',
         {
-          className: `fixed top-24 left-1/2 transform -translate-x-1/2 z-[250] px-6 py-3 rounded-full shadow-2xl text-[11px] font-medium uppercase tracking-wider transition-all duration-300 ${
+          className: `fixed top-20 left-1/2 transform -translate-x-1/2 z-[250] px-6 py-3 rounded-full shadow-2xl text-[11px] font-medium uppercase tracking-wider ${
             toast.type === 'error' ? 'bg-red-600 text-white' : toast.type === 'info' ? 'bg-blue-600 text-white' : 'bg-black text-white'
           }`
         },
