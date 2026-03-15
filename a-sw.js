@@ -7,6 +7,17 @@ const urlsToCache = [
   '/apb-admin/aicon-512.png'
 ];
 
+async function cacheResource(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      cache.put(request, response.clone());
+    }
+  } catch (e) {
+    console.warn('Не удалось закэшировать', request.url);
+  }
+}
 // Установка SW и кэширование
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -31,6 +42,7 @@ self.addEventListener('activate', event => {
     ).then(() => self.clients.claim())
   );
 });
+
 
 // Стратегия: Cache First, затем Network (для скорости)
 self.addEventListener('fetch', event => {
