@@ -154,13 +154,13 @@ return () => clearInterval(interval);
 }, [loading]);
 const showEvent = (text, isTemporary = false) => {
 if (isTemporary) {
-if (!lastEventText) return;
+if (!text) return;
 if (tempEventTimeoutRef.current) clearTimeout(tempEventTimeoutRef.current);
-setCurrentEvent({ id: Date.now(), text: lastEventText, isTemporary: true });
+setCurrentEvent({ id: Date.now(), text: text, isTemporary: true });
 tempEventTimeoutRef.current = setTimeout(() => {
 setCurrentEvent(prev => prev?.isTemporary ? null : prev);
 tempEventTimeoutRef.current = null;
-}, 1000);
+}, 2000); // 2 секунды для временных событий (загрузка)
 } else {
 if (eventTimeoutRef.current) clearTimeout(eventTimeoutRef.current);
 setCurrentEvent({ id: Date.now(), text, isTemporary: false });
@@ -276,18 +276,33 @@ firestoreId: doc.id,
 ...doc.data()
 }));
 console.log('🔥 Получены оценки:', evaluations.length);
-// Показываем новые события только после первой загрузки
-if (initialLoadDone && data.length > 0) {
-const newEvals = evaluations.filter(newItem =>
-!data.some(oldItem => oldItem.firestoreId === newItem.firestoreId)
-);
-newEvals.forEach(item => {
-const judge = item.judgeName || 'Судья';
-const participantNumbers = item.participants?.map(p => p.number).join(', ') || '—';
-const text = `${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`;
-showEvent(text);
-});
+
+// ЛОГИКА ЗАГРУЗКИ И ОБНОВЛЕНИЯ
+if (!initialLoadDone) {
+    // Первая загрузка
+    setData(evaluations);
+    setInitialLoadDone(true);
+    setLoading(false);
+    
+    // Показываем "Данные загружены" на 2 секунды
+    showEvent('Данные загружены', true);
+} else {
+    // Последующие обновления
+    const newEvals = evaluations.filter(newItem =>
+        !data.some(oldItem => oldItem.firestoreId === newItem.firestoreId)
+    );
+    
+    if (newEvals.length > 0) {
+        newEvals.forEach(item => {
+            const judge = item.judgeName || 'Судья';
+            const participantNumbers = item.participants?.map(p => p.number).join(', ') || '—';
+            const text = `${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`;
+            showEvent(text);
+        });
+    }
+    setData(evaluations);
 }
+
 if (evaluations.length > 0) {
 const latest = evaluations[0];
 if (latest.createdAt) {
@@ -296,12 +311,6 @@ setSelectedDate({ month: lastDate.getMonth(), year: lastDate.getFullYear() });
 setSelectedDay(lastDate.getDate());
 }
 }
-setData(evaluations);
-setTimeout(() => {
-if (mounted) {
-setLoading(false);
-}
-}, 100);
 }, (error) => {
 console.error("❌ Snapshot error:", error);
 if (mounted) {
@@ -312,18 +321,7 @@ return () => {
 mounted = false;
 unsubscribe();
 };
-}, []);
-// 🔔 ПОКАЗ "ДАННЫЕ ЗАГРУЖЕНЫ" ПОСЛЕ ПЕРВОЙ ЗАГРУЗКИ
-React.useEffect(() => {
-if (!loading && !initialLoadDone) {
-setCurrentEvent({ id: 'initial', text: 'Данные загружены', isTemporary: true });
-setInitialLoadDone(true);
-const timer = setTimeout(() => {
-setCurrentEvent(prev => prev?.id === 'initial' ? null : prev);
-}, 2000);
-return () => clearTimeout(timer);
-}
-}, [loading, initialLoadDone]);
+}, [initialLoadDone, data]);
 React.useEffect(() => {
 if (scrollRef.current) {
 scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
