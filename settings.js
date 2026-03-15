@@ -160,7 +160,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
 
   if (!show) return null;
 
-  // ✅ Тост — рендерим инлайн (без отдельного компонента, чтобы не было warning про key)
+  // ✅ Тост — рендерим инлайн
   const toastElement = toast.show ? React.createElement(
     'div',
     { className: 'fixed inset-0 z-[300] flex items-center justify-center pointer-events-none' },
@@ -169,7 +169,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
     }, toast.message)
   ) : null;
 
-  // ✅ Модальное окно подтверждения удаления — инлайн
+  // ✅ Модальное окно подтверждения удаления
   const confirmModal = confirmDelete ? React.createElement(
     'div',
     { 
@@ -199,14 +199,14 @@ export function Settings({ show, onClose, adminDeviceId }) {
     )
   ) : null;
 
-  // ✅ Скелетон — инлайн
-  const renderSkeletonRow = () => React.createElement(
-    'tr', { className: 'animate-pulse' },
-    ...Array.from({ length: 5 }).map((_, i) =>
-      React.createElement('td', { key: i, className: 'px-4 py-3' },
-        React.createElement('div', { className: 'h-3 bg-gray-100 rounded w-full' })
-      )
-    )
+  // ✅ Скелетон — функция, принимающая ключ
+  const renderSkeletonRow = (key) => React.createElement(
+    'tr', { key, className: 'animate-pulse' },
+    React.createElement('td', { className: 'px-4 py-3' }, React.createElement('div', { className: 'h-3 bg-gray-100 rounded w-full' })),
+    React.createElement('td', { className: 'px-4 py-3' }, React.createElement('div', { className: 'h-3 bg-gray-100 rounded w-full' })),
+    React.createElement('td', { className: 'px-4 py-3' }, React.createElement('div', { className: 'h-3 bg-gray-100 rounded w-full' })),
+    React.createElement('td', { className: 'px-4 py-3' }, React.createElement('div', { className: 'h-3 bg-gray-100 rounded w-full' })),
+    React.createElement('td', { className: 'px-4 py-3' }, React.createElement('div', { className: 'h-3 bg-gray-100 rounded w-full' }))
   );
 
   return React.createElement(
@@ -260,9 +260,9 @@ export function Settings({ show, onClose, adminDeviceId }) {
             ),
             React.createElement('tbody', { className: 'divide-y divide-gray-50' },
               loadingJudges
-                ? Array.from({ length: 3 }).map((_, i) => renderSkeletonRow())
+                ? Array.from({ length: 3 }).map((_, i) => renderSkeletonRow(i))
                 : judges.length === 0
-                  ? React.createElement('tr', null,
+                  ? React.createElement('tr', { key: 'empty' },
                       React.createElement('td', { colSpan: 6, className: 'px-4 py-8 text-center text-gray-400' }, 'Нет ключей')
                     )
                   : judges.map((judge) => React.createElement(
@@ -282,7 +282,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
                       React.createElement('td', { className: 'px-4 py-3' }, judge.city || '—'),
                       React.createElement('td', { className: 'px-4 py-3 text-[10px]' }, judge.deviceId ? judge.deviceId.substring(0, 12) + '…' : '—'),
                       
-                      // ✅ Действия: отвязка + удаление
+                      // Действия: отвязка + удаление
                       React.createElement('td', { className: 'px-4 py-3' },
                         React.createElement('div', { className: 'flex items-center gap-3' },
                           // Отвязка
@@ -294,7 +294,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
                             React.createElement('div', { className: 'w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-black transition' }),
                             React.createElement('div', { className: 'absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-4' })
                           ),
-                          // ✅ Удаление (иконка корзины)
+                          // Удаление (иконка корзины)
                           React.createElement('button', {
                             className: 'text-gray-400 hover:text-red-600 transition p-1',
                             onClick: (e) => { e.stopPropagation(); setConfirmDelete(judge); },
@@ -326,9 +326,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
       )
     ),
     
-    // Тост
     toastElement,
-    // Модальное окно подтверждения
     confirmModal
   );
 }
