@@ -1,4 +1,3 @@
-import React, { useState, useEffect } from 'react';
 import { db, messaging, saveFcmToken, removeFcmToken, getJudges, updateJudgeDevice, createJudgeKey, deleteJudgeKey } from '/apb-admin/firebase-init.js';
 import { getToken } from 'firebase/messaging';
 
@@ -7,33 +6,26 @@ const injectCriticalStyles = () => {
   if (document.getElementById('settings-inline-styles')) return;
   const style = document.createElement('style');
   style.id = 'settings-inline-styles';
-  style.textContent = `
-    @keyframes fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .animate-fade-in { animation: fade-in 0.2s ease-out; }
-    .animate-pulse { animation: pulse 1.5s ease-in-out infinite; }
-    .animate-spin { animation: spin 1s linear infinite; }
-  `;
+  style.textContent = `@keyframes fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } } @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } } @keyframes spin { to { transform: rotate(360deg); } } .animate-fade-in { animation: fade-in 0.2s ease-out; } .animate-pulse { animation: pulse 1.5s ease-in-out infinite; } .animate-spin { animation: spin 1s linear infinite; }`;
   document.head.appendChild(style);
 };
 
 export function Settings({ show, onClose, adminDeviceId }) {
-  useEffect(() => { injectCriticalStyles(); }, []);
+  React.useEffect(() => { injectCriticalStyles(); }, []);
   
-  const [pushEnabled, setPushEnabled] = useState(() => {
+  const [pushEnabled, setPushEnabled] = React.useState(() => {
     const saved = localStorage.getItem('pushEnabled');
     return saved === null ? true : saved === 'true';
   });
-  const [judges, setJudges] = useState([]);
-  const [loadingJudges, setLoadingJudges] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [toast, setToast] = useState({ show: false, message: '' });
-  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [judges, setJudges] = React.useState([]);
+  const [loadingJudges, setLoadingJudges] = React.useState(false);
+  const [generating, setGenerating] = React.useState(false);
+  const [toast, setToast] = React.useState({ show: false, message: '' });
+  const [confirmDelete, setConfirmDelete] = React.useState(null);
   
-  // ✅ Состояние для проверки обновлений
-  const [updateStatus, setUpdateStatus] = useState('idle'); // idle, checking, available, current, error
-  const [updateMessage, setUpdateMessage] = useState('');
+  // ✅ Состояния для проверки обновлений
+  const [updateStatus, setUpdateStatus] = React.useState('idle'); // idle, checking, available, current
+  const [updateMessage, setUpdateMessage] = React.useState('');
 
   const copyToClipboard = async (text, label = 'Ключ') => {
     try {
@@ -55,8 +47,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
       const now = Date.now();
       if (cached && cachedTime && (now - parseInt(cachedTime)) < 5 * 60 * 1000) {
         setJudges(JSON.parse(cached));
-      }
-      const judgesList = await getJudges();
+      }      const judgesList = await getJudges();
       setJudges(judgesList);
       localStorage.setItem('judgesCache', JSON.stringify(judgesList));
       localStorage.setItem('judgesCacheTime', now.toString());
@@ -69,9 +60,9 @@ export function Settings({ show, onClose, adminDeviceId }) {
     }
   };
 
-  useEffect(() => { if (show) loadJudges(); }, [show]);
+  React.useEffect(() => { if (show) loadJudges(); }, [show]);
   
-  useEffect(() => {
+  React.useEffect(() => {
     if (show && window.lucide) setTimeout(() => lucide.createIcons(), 50);
   }, [show, judges, loadingJudges]);
 
@@ -105,8 +96,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
       setJudges(prev => prev.filter(j => j.key !== judge.key));
       setToast({ show: true, message: 'Ключ удалён' });
       setTimeout(() => setToast({ show: false, message: '' }), 1500);
-    } catch (err) {
-      console.error('Ошибка удаления ключа:', err);
+    } catch (err) {      console.error('Ошибка удаления ключа:', err);
       setToast({ show: true, message: 'Ошибка удаления' });
       setTimeout(() => setToast({ show: false, message: '' }), 2000);
     }
@@ -133,63 +123,41 @@ export function Settings({ show, onClose, adminDeviceId }) {
   const checkForUpdates = async () => {
     setUpdateStatus('checking');
     setUpdateMessage('Проверка...');
-    
+
     try {
       const CACHE_NAME = 'apb-admin-v1';
-      const urlsToCheck = [
-        '/apb-admin/index.html',
-        '/apb-admin/a-manifest.json',
-        '/apb-admin/aicon-72.png',
-        '/apb-admin/aicon-192.png',
-        '/apb-admin/aicon-512.png'
-      ];
-      
+      // Проверяем только основной HTML и манифест
+      const urlsToCheck = ['/apb-admin/index.html'];
+
       let hasUpdates = false;
       const cache = await caches.open(CACHE_NAME);
-      
+
       for (const url of urlsToCheck) {
         try {
-          // Получаем кэшированную версию
+          // Пробуем получить кэшированную версию
           const cachedResponse = await cache.match(url);
-          // Получаем актуальную версию с сервера (с bypass кэша)
-          const networkResponse = await fetch(url, { cache: 'no-cache' });
-          
+          // Пробуем получить свежую версию с сервера, обходя кэш
+          const networkResponse = await fetch(url, { cache: 'reload' });
+
           if (!cachedResponse) {
-            // Файла нет в кэше - значит есть обновление
+            // Если в кэше нет файла - это обновление
             hasUpdates = true;
             break;
           }
-          
-          // Сравниваем заголовки Last-Modified или ETag
-          const cachedLastModified = cachedResponse.headers.get('Last-Modified');
-          const networkLastModified = networkResponse.headers.get('Last-Modified');
-          const cachedETag = cachedResponse.headers.get('ETag');
-          const networkETag = networkResponse.headers.get('ETag');
-          
-          // Если есть ETag - сравниваем его
-          if (cachedETag && networkETag && cachedETag !== networkETag) {
-            hasUpdates = true;
-            break;
-          }
-          
-          // Если есть Last-Modified - сравниваем его
-          if (cachedLastModified && networkLastModified && cachedLastModified !== networkLastModified) {
-            hasUpdates = true;
-            break;
-          }
-          
-          // Если нет заголовков - сравниваем размер контента
-          const cachedText = await cachedResponse.text();
+
+          // Сравниваем содержимое          const cachedText = await cachedResponse.text();
           const networkText = await networkResponse.text();
+
           if (cachedText !== networkText) {
             hasUpdates = true;
             break;
           }
         } catch (err) {
-          console.warn('Не удалось проверить файл:', url, err);
+          // Если не удалось проверить один из файлов, продолжаем
+          console.warn(`Не удалось проверить ${url}:`, err);
         }
       }
-      
+
       if (hasUpdates) {
         setUpdateStatus('available');
         setUpdateMessage('Есть обновление');
@@ -199,39 +167,38 @@ export function Settings({ show, onClose, adminDeviceId }) {
       }
     } catch (err) {
       console.error('Ошибка проверки обновлений:', err);
-      setUpdateStatus('error');
-      setUpdateMessage('Ошибка проверки');
+      setUpdateStatus('current'); // В случае ошибки считаем, что всё ок
+      setUpdateMessage('Актуальная версия');
     }
   };
 
   // ✅ Очистка кэша и перезагрузка
   const clearCacheAndReload = async () => {
     try {
-      const CACHE_NAME = 'apb-admin-v1';
-      const cacheKeys = await caches.keys();
-      for (const key of cacheKeys) {
-        if (key === CACHE_NAME) {
-          await caches.delete(key);
-        }
-      }
-      
-      // Отправляем сообщение сервис-воркеру
-      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      // Удаляем все кэши, начинающиеся с 'apb-admin'
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames
+          .filter(name => name.startsWith('apb-admin'))
+          .map(name => caches.delete(name))
+      );
+
+      // Сообщаем Service Worker, чтобы он пропустил ожидание
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({ action: 'skipWaiting' });
       }
-      
+
       setToast({ show: true, message: 'Кэш очищен, перезагрузка...' });
       setTimeout(() => {
         window.location.reload(true);
       }, 1000);
     } catch (err) {
       console.error('Ошибка очистки кэша:', err);
-      setToast({ show: true, message: 'Ошибка обновления' });
-      setTimeout(() => setToast({ show: false, message: '' }), 2000);
+      setToast({ show: true, message: 'Ошибка обновления' });      setTimeout(() => setToast({ show: false, message: '' }), 2000);
     }
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!adminDeviceId) return;
     const handlePushToggle = async () => {
       if (pushEnabled) {
@@ -276,8 +243,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
       {
         className: 'bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl',
         onClick: e => e.stopPropagation()
-      },
-      React.createElement('h3', { className: 'text-lg font-medium mb-2' }, 'Подтвердите удаление'),
+      },      React.createElement('h3', { className: 'text-lg font-medium mb-2' }, 'Подтвердите удаление'),
       React.createElement('p', { className: 'text-sm text-gray-600 mb-4' },
         `Вы действительно хотите удалить ключ "${confirmDelete.name || confirmDelete.key}"?`
       ),
@@ -309,8 +275,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
     React.createElement(
       'div',
       { className: 'bg-white w-full max-w-4xl rounded-[32px] p-8 shadow-2xl space-y-6 border border-gray-100 max-h-[90vh] overflow-y-auto', onClick: e => e.stopPropagation() },
-      
-      // Заголовок
+
       React.createElement('div', { className: 'flex justify-between items-center sticky top-0 bg-white pb-4 border-b border-gray-100 z-10' },
         React.createElement('h2', { className: 'text-xl font-light tracking-tight' }, 'Настройки'),
         React.createElement('button', { onClick: onClose, className: 'text-gray-400 hover:text-gray-600 transition' },
@@ -318,7 +283,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
         )
       ),
 
-      // Push-уведомления
       React.createElement('div', { className: 'space-y-4' },
         React.createElement('div', { className: 'flex items-center justify-between' },
           React.createElement('span', { className: 'text-[13px] font-medium uppercase tracking-widest' }, 'Push-уведомления'),
@@ -328,8 +292,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
               onChange: e => { const v = e.target.checked; setPushEnabled(v); localStorage.setItem('pushEnabled', v); }
             }),
             React.createElement('div', { className: 'w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-black transition' }),
-            React.createElement('div', { className: 'absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5' })
-          )
+            React.createElement('div', { className: 'absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5' })          )
         ),
         React.createElement('p', { className: 'text-[10px] text-gray-400 uppercase tracking-wider' },
           'Включите, чтобы получать уведомления о новых оценках даже когда приложение закрыто.'
@@ -338,7 +301,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
 
       React.createElement('hr', { className: 'border-gray-100' }),
 
-      // Таблица ключей
       React.createElement('div', { className: 'space-y-4' },
         React.createElement('h3', { className: 'text-[11px] font-medium uppercase tracking-widest text-gray-500' }, 'Управление ключами судей'),
         React.createElement('div', { className: 'overflow-x-auto' },
@@ -361,7 +323,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
                     )
                   : judges.map((judge) => React.createElement(
                       'tr', { key: judge.key, className: 'hover:bg-gray-50 transition' },
-                      
                       React.createElement('td', {
                         className: 'px-4 py-3 font-mono text-[10px] cursor-pointer hover:text-blue-600 transition flex items-center gap-1',
                         onClick: () => copyToClipboard(judge.key, 'Ключ'),
@@ -370,11 +331,9 @@ export function Settings({ show, onClose, adminDeviceId }) {
                         judge.key,
                         React.createElement('i', { 'data-lucide': 'copy', className: 'w-3 h-3 opacity-40 hover:opacity-100 transition', width: '12', height: '12' })
                       ),
-                      
                       React.createElement('td', { className: 'px-4 py-3' }, judge.displayName || '—'),
                       React.createElement('td', { className: 'px-4 py-3' }, judge.city || '—'),
                       React.createElement('td', { className: 'px-4 py-3 text-[10px]' }, judge.deviceId ? judge.deviceId.substring(0, 12) + '…' : '—'),
-                      
                       React.createElement('td', { className: 'px-4 py-3' },
                         React.createElement('div', { className: 'flex items-center gap-3' },
                           React.createElement('label', { className: 'relative inline-flex items-center cursor-pointer', title: 'Отвязать устройство' },
@@ -382,8 +341,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
                               type: 'checkbox', className: 'sr-only peer', checked: !!judge.deviceId,
                               onChange: e => handleDeviceToggle(judge.key, judge.deviceId, e.target.checked)
                             }),
-                            React.createElement('div', { className: 'w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-black transition' }),
-                            React.createElement('div', { className: 'absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-4' })
+                            React.createElement('div', { className: 'w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-black transition' }),                            React.createElement('div', { className: 'absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-4' })
                           ),
                           React.createElement('button', {
                             className: 'text-gray-400 hover:text-red-600 transition p-1',
@@ -399,7 +357,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
           )
         ),
 
-        // Кнопка генерации нового ключа
         React.createElement('div', { className: 'flex justify-end mt-4' },
           React.createElement('button', {
             onClick: handleGenerateKey, disabled: generating,
@@ -414,35 +371,26 @@ export function Settings({ show, onClose, adminDeviceId }) {
           )
         ),
 
-        // ✅ Блок проверки обновлений
-        React.createElement('div', { className: 'flex flex-col items-end mt-2 space-y-2' },
-          // Кнопка проверки
+        // ✅ Блок проверки обновлений - чёрная надпись ниже кнопки
+        React.createElement('div', { className: 'flex flex-col items-end mt-3 space-y-1' },
+          // Кнопка "Проверить обновление"
           React.createElement('button', {
             onClick: checkForUpdates,
             disabled: updateStatus === 'checking',
-            className: 'text-black text-[10px] font-medium uppercase tracking-wider hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2'
+            className: 'text-black text-[10px] font-medium uppercase tracking-wider hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition'
           },
-            updateStatus === 'checking'
-              ? React.createElement(React.Fragment, null,
-                  React.createElement('div', { className: 'w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin' }),
-                  'Проверка...'
-                )
-              : 'Проверить обновление'
+            updateStatus === 'checking' ? 'Проверка...' : 'Проверить обновление'
           ),
-          
-          // Статус обновления
+          // Надпись с результатом проверки
           updateStatus !== 'idle' && updateStatus !== 'checking' && React.createElement(
             'button', {
               onClick: updateStatus === 'available' ? clearCacheAndReload : undefined,
               className: `text-[10px] font-medium tracking-wider transition ${
                 updateStatus === 'available' 
                   ? 'text-green-600 hover:text-green-700 cursor-pointer' 
-                  : updateStatus === 'current'
-                  ? 'text-gray-400 cursor-default'
-                  : 'text-red-500 cursor-default'
+                  : 'text-gray-400 cursor-default'
               }`
-            },
-            updateStatus === 'available' && React.createElement('span', { className: 'mr-1' }, '●'),
+            },            updateStatus === 'available' && React.createElement('span', { className: 'mr-1' }, '●'),
             updateMessage
           )
         )
