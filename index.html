@@ -21,11 +21,11 @@
 <!-- Import map for Firebase modules -->
 <script type="importmap">
 {
-  "imports": {
-    "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
-    "firebase/messaging": "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js"
-  }
+"imports": {
+"firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+"firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
+"firebase/messaging": "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js"
+}
 }
 </script>
 <!-- Наш модуль инициализации Firebase -->
@@ -34,89 +34,62 @@
 <script type="module" src="/apb-admin/settings.js"></script>
 <style>
 * {
-  font-family: 'Inter', sans-serif;
+font-family: 'Inter', sans-serif;
 }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateX(-5px); }
-  to { opacity: 1; transform: translateX(0); }
+from { opacity: 0; transform: translateX(-5px); }
+to { opacity: 1; transform: translateX(0); }
 }
 .event-text {
-  animation: fadeIn 0.3s ease-out;
+animation: fadeIn 0.3s ease-out;
 }
 /* Стили для прелоадера */
 .preloader-container {
-  text-align: center;
-  width: 100%;
-  max-width: 280px;
+text-align: center;
+width: 100%;
+max-width: 280px;
 }
 .preloader-text {
-  font-weight: 200;
-  font-size: 0.85rem;
-  letter-spacing: 0.15em;
-  color: #000;
-  margin-bottom: 24px;
-  text-transform: lowercase;
-  animation: blink 2s ease-in-out infinite;
+font-weight: 200;
+font-size: 0.85rem;
+letter-spacing: 0.15em;
+color: #000;
+margin-bottom: 24px;
+text-transform: lowercase;
+animation: blink 2s ease-in-out infinite;
 }
 @keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+0%, 100% { opacity: 1; }
+50% { opacity: 0.3; }
 }
 .preloader-progress-container {
-  width: 100%;
-  height: 1px;
-  background-color: #f2f2f2;
-  margin-bottom: 12px;
-  position: relative;
+width: 100%;
+height: 1px;
+background-color: #f2f2f2;
+margin-bottom: 12px;
+position: relative;
 }
 .preloader-progress-bar {
-  height: 100%;
-  width: 0%;
-  background-color: #000;
-  transition: width 0.3s ease-out;
+height: 100%;
+width: 0%;
+background-color: #000;
+transition: width 0.1s linear;
 }
 .preloader-percentage {
-  font-weight: 100;
-  font-size: 0.75rem;
-  color: #666;
-  letter-spacing: 0.1em;
-  margin-top: 8px;
-}
-.preloader-stage {
-  font-size: 0.7rem;
-  color: #999;
-  margin-top: 6px;
-  text-transform: lowercase;
-  letter-spacing: 0.1em;
+font-weight: 100;
+font-size: 0.75rem;
+color: #666;
+letter-spacing: 0.1em;
+margin-top: 8px;
 }
 .fade-in-ui {
-  animation: fadeInUI 1s ease-out forwards;
+animation: fadeInUI 1s ease-out forwards;
 }
 @keyframes fadeInUI {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-/* Оптимизация: плавное появление контента */
-.content-fade-in {
-  animation: contentFadeIn 0.4s ease-out forwards;
-}
-@keyframes contentFadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-/* Оптимизация: скелетон для списка */
-.skeleton-row {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: loading 1.5s infinite;
-  border-radius: 16px;
-  height: 48px;
-}
-@keyframes loading {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+from { opacity: 0; transform: translateY(5px); }
+to { opacity: 1; transform: translateY(0); }
 }
 </style>
 </head>
@@ -136,6 +109,7 @@ const MONTHS = [
 function App() {
   const [data, setData] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [progress, setProgress] = React.useState(0);
   const [selectedCity, setSelectedCity] = React.useState('Все города');
   const [selectedDate, setSelectedDate] = React.useState({
     month: new Date().getMonth(),
@@ -154,13 +128,24 @@ function App() {
   const [showUpdateNotification, setShowUpdateNotification] = React.useState(false);
   const [adminDeviceId, setAdminDeviceId] = React.useState('');
   const [showPushSettings, setShowPushSettings] = React.useState(false);
-  const [loadStage, setLoadStage] = React.useState('init');
-  const [initialLoadDone, setInitialLoadDone] = React.useState(false);
-  
+
   const scrollRef = React.useRef(null);
   const calendarRef = React.useRef(null);
   const eventTimeoutRef = React.useRef(null);
   const tempEventTimeoutRef = React.useRef(null);
+
+  // Эффект для анимации прогресса (только пока loading = true)
+  React.useEffect(() => {
+    if (!loading) return;
+    const interval = setInterval(() => {
+      setProgress(prev => {
+        // Плавно приближаемся к 99%
+        const next = prev + (99 - prev) * 0.02;
+        return next > 99 ? 99 : next;
+      });
+    }, 100);
+    return () => clearInterval(interval);
+  }, [loading]);
 
   React.useEffect(() => {
     return () => {
@@ -169,7 +154,7 @@ function App() {
     };
   }, []);
 
-  const showEvent = (text, isTemporary = false) => {
+  const showEvent = React.useCallback((text, isTemporary = false) => {
     if (isTemporary) {
       if (!text) return;
       if (tempEventTimeoutRef.current) clearTimeout(tempEventTimeoutRef.current);
@@ -187,7 +172,7 @@ function App() {
         eventTimeoutRef.current = null;
       }, 30000);
     }
-  };
+  }, []);
 
   const handleDashboardClick = () => {
     if (currentEvent && !currentEvent.isTemporary) {
@@ -243,7 +228,9 @@ function App() {
       navigator.serviceWorker.register('/apb-admin/a-sw.js')
         .then((registration) => {
           console.log('SW registered:', registration);
-          setInterval(() => { registration.update(); }, 60 * 60 * 1000);
+          setInterval(() => {
+            registration.update();
+          }, 60 * 60 * 1000);
           registration.addEventListener('updatefound', () => {
             const newWorker = registration.installing;
             console.log('New service worker found');
@@ -279,31 +266,87 @@ function App() {
           text = `${judgeName} оценил участника №${participantNumbers} в номинации ${discipline}`;
         }
       }
-      if (text) { showEvent(text); }
+      if (text) {
+        showEvent(text);
+      }
     });
     return () => unsubscribe();
-  }, []);
+  }, [showEvent]);
 
-  // Оптимизация: реальный прогресс по этапам загрузки
-  const progress = React.useMemo(() => {
-    const stages = { init: 10, firebase: 30, 'first-data': 70, ready: 100 };
-    return stages[loadStage] || 0;
-  }, [loadStage]);
+  // Подписка на Firestore (один раз, без перезапуска)
+  React.useEffect(() => {
+    let mounted = true;
+    let isFirstLoad = true;
 
-  // Оптимизация: кэширование вычислений через useMemo
-  const filteredByDate = React.useMemo(() => {
-    return data.filter(item => {
+    const evaluationsQuery = query(
+      collection(db, 'evaluations'),
+      orderBy('createdAt', 'desc'),
+      limit(100)
+    );
+
+    const unsubscribe = onSnapshot(evaluationsQuery, (snapshot) => {
+      if (!mounted) return;
+
+      const evaluations = snapshot.docs.map(doc => ({
+        firestoreId: doc.id,
+        ...doc.data()
+      }));
+      console.log('🔥 Получены оценки:', evaluations.length);
+
+      setData(prevData => {
+        if (isFirstLoad) {
+          isFirstLoad = false;
+          // Первая загрузка — скрываем прелоадер
+          setLoading(false);
+          showEvent('Данные загружены', true);
+          return evaluations;
+        } else {
+          // Последующие обновления
+          const newEvals = evaluations.filter(newItem =>
+            !prevData.some(oldItem => oldItem.firestoreId === newItem.firestoreId)
+          );
+          if (newEvals.length > 0) {
+            newEvals.forEach(item => {
+              const judge = item.judgeName || 'Судья';
+              const participantNumbers = item.participants?.map(p => p.number).join(', ') || '—';
+              const text = `${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`;
+              showEvent(text);
+            });
+          }
+          return evaluations;
+        }
+      });
+
+      if (evaluations.length > 0) {
+        const latest = evaluations[0];
+        if (latest.createdAt) {
+          const lastDate = latest.createdAt.toDate();
+          setSelectedDate({ month: lastDate.getMonth(), year: lastDate.getFullYear() });
+          setSelectedDay(lastDate.getDate());
+        }
+      }
+    }, (error) => {
+      console.error("❌ Snapshot error:", error);
+      if (mounted) {
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, [showEvent]); // showEvent стабильна, эффект не перезапустится без необходимости
+
+  // ========== Мемоизированные производные данные ==========
+  const allEntriesRaw = React.useMemo(() => {
+    const list = [];
+    const filteredData = data.filter(item => {
       if (!item.createdAt) return false;
       const date = item.createdAt.toDate();
-      if (date.getMonth() !== selectedDate.month || date.getFullYear() !== selectedDate.year) return false;
-      if (selectedDay !== null && date.getDate() !== selectedDay) return false;
-      return true;
+      return date.getMonth() === selectedDate.month && date.getFullYear() === selectedDate.year && (selectedDay === null || date.getDate() === selectedDay);
     });
-  }, [data, selectedDate, selectedDay]);
-
-  const flatList = React.useMemo(() => {
-    const list = [];
-    filteredByDate.forEach(item => {
+    filteredData.forEach(item => {
       if (item.participants && Array.isArray(item.participants)) {
         item.participants.forEach((p, pIdx) => {
           list.push({
@@ -327,11 +370,16 @@ function App() {
       return timeA - timeB;
     });
     return list;
-  }, [filteredByDate]);
+  }, [data, selectedDate.month, selectedDate.year, selectedDay]);
 
   const aggregatedRanked = React.useMemo(() => {
+    const filteredData = data.filter(item => {
+      if (!item.createdAt) return false;
+      const date = item.createdAt.toDate();
+      return date.getMonth() === selectedDate.month && date.getFullYear() === selectedDate.year && (selectedDay === null || date.getDate() === selectedDay);
+    });
     const groups = {};
-    filteredByDate.forEach(item => {
+    filteredData.forEach(item => {
       if (item.participants && Array.isArray(item.participants)) {
         item.participants.forEach(p => {
           const date = item.createdAt ? item.createdAt.toDate() : new Date();
@@ -357,28 +405,26 @@ function App() {
         });
       }
     });
-    return Object.values(groups).map(g => ({
+    const aggregated = Object.values(groups).map(g => ({
       ...g,
       avgScore: g.scores.reduce((a, b) => a + b, 0) / g.scores.length,
       allComments: g.comments,
       allPhotos: [...new Set(g.photos)]
-    })).sort((a, b) => b.avgScore - a.avgScore);
-  }, [filteredByDate]);
+    }));
+    return aggregated.sort((a, b) => b.avgScore - a.avgScore);
+  }, [data, selectedDate.month, selectedDate.year, selectedDay]);
 
   const cities = React.useMemo(() => {
-    return ['Все города', ...new Set(flatList.map(e => e.city))];
-  }, [flatList]);
+    return ['Все города', ...new Set(allEntriesRaw.map(e => e.city))];
+  }, [allEntriesRaw]);
 
   const filteredLiveEntries = React.useMemo(() => {
-    return selectedCity === 'Все города'
-      ? flatList
-      : flatList.filter(e => e.city === selectedCity);
-  }, [flatList, selectedCity]);
+    if (selectedCity === 'Все города') return allEntriesRaw;
+    return allEntriesRaw.filter(e => e.city === selectedCity);
+  }, [allEntriesRaw, selectedCity]);
 
   const nominationGroups = React.useMemo(() => {
-    const filteredAggregated = selectedCity === 'Все города'
-      ? aggregatedRanked
-      : aggregatedRanked.filter(g => g.city === selectedCity);
+    const filteredAggregated = selectedCity === 'Все города' ? aggregatedRanked : aggregatedRanked.filter(g => g.city === selectedCity);
     const groups = {};
     filteredAggregated.forEach(g => {
       if (!groups[g.discipline]) groups[g.discipline] = [];
@@ -400,146 +446,9 @@ function App() {
       }
     });
     return Array.from(days).sort((a, b) => a - b);
-  }, [data, selectedDate]);
+  }, [data, selectedDate.month, selectedDate.year]);
 
-  // Оптимизация: компонент строки списка (вынесен для React.memo)
-  const LiveEntryRow = React.memo(({ item, onOpen }) => (
-    <div className="grid grid-cols-[60px_160px_70px_70px_110px_110px_1fr_60px] items-center bg-gray-50/40 rounded-2xl px-4 py-3 text-[11px] hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all">
-      <div className="text-gray-900">#{item.number}</div>
-      <div className="text-gray-900 truncate pr-4">{item.discipline}</div>
-      <div className="text-gray-900 text-[13px]">{item.score}</div>
-      <div className="text-gray-400">{/* место */}</div>
-      <div className="truncate pr-4 text-gray-600">{item.judge}</div>
-      <div className="text-gray-400 truncate pr-4">{item.city}</div>
-      <div className="text-gray-400 truncate text-[10px] pr-4" title={item.comment || "—"}>{item.comment || "—"}</div>
-      <div className="flex justify-end">
-        <button onClick={() => onOpen(item)} className="flex items-center gap-1.5 text-gray-500 p-2 hover:bg-gray-200 rounded-xl transition-all">
-          <i data-lucide="image" width="14" height="14"></i>
-          <span className="text-[10px]">{item.photos.length}</span>
-        </button>
-      </div>
-    </div>
-  ));
-  LiveEntryRow.displayName = 'LiveEntryRow';
-
-  // Оптимизация: компонент строки агрегированных данных
-  const AggregatedRow = React.memo(({ p, pIdx, onOpen }) => {
-    const isFirst = pIdx === 0;
-    return (
-      <div className={`flex justify-between items-center px-5 py-4 rounded-[22px] transition-all ${isFirst ? 'bg-gray-100' : 'bg-gray-50/60'}`}>
-        <div className="flex flex-col">
-          <span className={`text-[12px] ${isFirst ? 'text-gray-900' : 'text-gray-700'}`}>№ {p.number}</span>
-          <span className="text-[8px] text-gray-400 uppercase tracking-widest">{p.city}</span>
-        </div>
-        <div className="flex items-center gap-2 text-[11px] tracking-tight">
-          <i data-lucide="award" width="14" height="14" className={isFirst ? 'text-gray-700' : 'text-gray-300'} />
-          {pIdx + 1} МЕСТО
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <span className="text-[15px] tracking-tighter">{p.avgScore.toFixed(1)}</span>
-            <span className="text-[7px] block text-gray-400 uppercase -mt-1">БАЛЛЫ</span>
-          </div>
-          <button onClick={() => onOpen(p)} className="p-2 hover:bg-gray-200 rounded-full transition-all">
-            <i data-lucide="sparkles" width="16" height="16" className={isFirst ? 'text-gray-700' : 'text-gray-400'} />
-          </button>
-        </div>
-      </div>
-    );
-  });
-  AggregatedRow.displayName = 'AggregatedRow';
-
-  // Оптимизация: эффект загрузки с реальными этапами
-  React.useEffect(() => {
-    let mounted = true;
-    
-    // Этап 1: инициализация завершена (firebase-init.js уже загрузился)
-    setLoadStage('firebase');
-    
-    const evaluationsQuery = query(
-      collection(db, 'evaluations'),
-      orderBy('createdAt', 'desc'),
-      limit(100)
-    );
-    
-    const unsubscribe = onSnapshot(evaluationsQuery, (snapshot) => {
-      if (!mounted) return;
-      
-      const evaluations = snapshot.docs.map(doc => ({
-        firestoreId: doc.id,
-        ...doc.data()
-      }));
-      
-      console.log('🔥 Получены оценки:', evaluations.length);
-
-      // Этап 2: первые данные получены
-      if (!initialLoadDone) {
-        setData(evaluations);
-        setInitialLoadDone(true);
-        setLoadStage('first-data');
-        
-        // Небольшая задержка для плавного перехода
-        setTimeout(() => {
-          if (mounted) {
-            setLoadStage('ready');
-            setLoading(false);
-            showEvent('Данные загружены', true);
-          }
-        }, 200);
-      } else {
-        // Обновления: показываем события для новых записей
-        const newEvals = evaluations.filter(newItem =>
-          !data.some(oldItem => oldItem.firestoreId === newItem.firestoreId)
-        );
-        
-        if (newEvals.length > 0) {
-          newEvals.forEach(item => {
-            const judge = item.judgeName || 'Судья';
-            const participantNumbers = item.participants?.map(p => p.number).join(', ') || '—';
-            const text = `${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`;
-            showEvent(text);
-          });
-        }
-        setData(evaluations);
-      }
-
-      // Авто-выбор даты по последнему событию
-      if (evaluations.length > 0 && !selectedDay) {
-        const latest = evaluations[0];
-        if (latest.createdAt) {
-          const lastDate = latest.createdAt.toDate();
-          setSelectedDate({ month: lastDate.getMonth(), year: lastDate.getFullYear() });
-          setSelectedDay(lastDate.getDate());
-        }
-      }
-    }, (error) => {
-      console.error("❌ Snapshot error:", error);
-      if (mounted) {
-        setLoadStage('ready');
-        setLoading(false);
-      }
-    });
-    
-    return () => {
-      mounted = false;
-      unsubscribe();
-    };
-  }, [initialLoadDone, data, selectedDay]);
-
-  // Оптимизация: эффект для lucide иконок только при изменении контента
-  React.useEffect(() => {
-    if (window.lucide && !loading) {
-      lucide.createIcons();
-    }
-  }, [loading, data, selectedCity, selectedDate]);
-
-  // Оптимизация: скролл только при изменении фильтров, не при каждом рендере
-  React.useEffect(() => {
-    if (!loading && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [loading, selectedCity, selectedDate, selectedDay]);
-
+  // ========== Вспомогательные функции (без изменений) ==========
   const analyzeComments = async (target, mode) => {
     setIsAnalyzing(true);
     setAiAnalysis("");
@@ -547,14 +456,14 @@ function App() {
     let commentsText = '';
     if (mode === 'single') {
       const { firestoreId, participantIdx } = target;
-      const record = flatList.find(e => e.firestoreId === firestoreId && e.participantIdx === participantIdx);
+      const record = allEntriesRaw.find(e => e.firestoreId === firestoreId && e.participantIdx === participantIdx);
       if (record && record.comment.trim()) {
         commentsText = `Судья ${record.judge}: "${record.comment}"`;
       }
     } else {
       const { number, discipline, city, date } = target;
       const targetDate = new Date(date).toDateString();
-      const comments = flatList
+      const comments = allEntriesRaw
         .filter(e =>
           e.number === number &&
           e.discipline === discipline &&
@@ -580,7 +489,8 @@ function App() {
           completionOptions: { stream: false, temperature: 0.6, maxTokens: "2000" },
           messages: [
             { role: "system", text: "Ты эксперт-аналитик конкурса по брейдингу (плетение кос, дреды, брейды, изготовление комплектов для вплета). Пиши профессионально и вежливо, давай краткие резюме (2-3 предложения)." },
-            { role: "user", text: `Проанализируй отзывы судей:\n${commentsText}` }
+            { role: "user", text: `Проанализируй отзывы судей:
+${commentsText}` }
           ]
         })
       });
@@ -666,35 +576,23 @@ ${commentsList || "Нет комментариев."}`;
     ? `${selectedDay} ${MONTHS[selectedDate.month]} ${selectedDate.year}`
     : `${MONTHS[selectedDate.month]} ${selectedDate.year}`;
 
-  // Рендер прелоадера с реальным прогрессом
-  if (loading) return (
-    <div className="min-h-screen bg-white flex items-center justify-center">
-      <div className="preloader-container fade-in-ui">
-        <div className="preloader-text">
-          {loadStage === 'init' && 'инициализация...'}
-          {loadStage === 'firebase' && 'подключение к базе...'}
-          {loadStage === 'first-data' && 'обработка данных...'}
-          {loadStage === 'ready' && 'завершение...'}
-        </div>
-        <div className="preloader-progress-container">
-          <div 
-            className="preloader-progress-bar" 
-            style={{ 
-              width: progress + '%',
-              transition: loadStage === 'ready' ? 'width 0.4s ease-out' : 'width 0.2s ease-out'
-            }}
-          ></div>
-        </div>
-        <div className="preloader-percentage">{Math.floor(progress)}%</div>
-        <div className="preloader-stage">
-          {loadStage === 'first-data' && `получено ${data.length} записей`}
+  // Прелоадер с прогресс-баром
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="preloader-container fade-in-ui">
+          <div className="preloader-text">загрузка данных...</div>
+          <div className="preloader-progress-container">
+            <div className="preloader-progress-bar" style={{ width: progress + '%' }}></div>
+          </div>
+          <div className="preloader-percentage">{Math.floor(progress)}%</div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
-    <div className={`min-h-screen bg-gray-50 font-sans text-gray-900 select-none pb-12 ${!loading ? 'content-fade-in' : ''}`}>
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-900 select-none pb-12">
       {/* Баннеры установки и обновления */}
       {deferredPrompt && (
         <div className="bg-black text-white px-4 py-2 flex justify-between items-center text-[10px] sticky top-0 z-[60]">
@@ -708,7 +606,7 @@ ${commentsList || "Нет комментариев."}`;
           <button onClick={handleUpdateClick} className="bg-white text-black px-3 py-1 rounded-full text-[9px]">ОБНОВИТЬ</button>
         </div>
       )}
-      
+
       {/* Липкая верхняя панель с дашбордом и кнопкой настроек */}
       <div className="sticky top-0 z-40 w-full pt-2 pb-4 px-3 bg-gray-50/80 backdrop-blur-sm">
         <div className="relative max-w-5xl mx-auto">
@@ -738,10 +636,10 @@ ${commentsList || "Нет комментариев."}`;
           </div>
         </div>
       </div>
-      
+
       {/* Окно настроек */}
       <Settings show={showPushSettings} onClose={() => setShowPushSettings(false)} adminDeviceId={adminDeviceId} />
-      
+
       {/* Основной интерфейс */}
       <div className="max-w-5xl mx-auto px-4 space-y-5 mt-2">
         {/* Календарь */}
@@ -796,38 +694,42 @@ ${commentsList || "Нет комментариев."}`;
             </div>
           )}
         </div>
-        
-        {/* Поток результатов с оптимизированным рендером */}
+
+        {/* Поток результатов */}
         <div className="bg-white rounded-[32px] p-6 border border-gray-200 overflow-hidden">
           <div className="flex justify-between items-center mb-5">
             <div className="flex flex-col">
               <h2 className="text-[10px] text-gray-400 tracking-[0.15em] uppercase">Поток результатов</h2>
-              <span className="text-[8px] text-gray-300 uppercase mt-1">Всего: {flatList.length}</span>
+              <span className="text-[8px] text-gray-300 uppercase mt-1">Всего: {allEntriesRaw.length}</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
               <span className="text-[9px] text-gray-500 tracking-wider">LIVE</span>
             </div>
           </div>
-          
           <div className="overflow-x-auto scrollbar-hide">
             <div className="min-w-[850px]">
               <div className="grid grid-cols-[60px_160px_70px_70px_110px_110px_1fr_60px] text-[8px] text-gray-400 px-4 mb-4 uppercase tracking-widest">
                 <div>№</div><div>Номинация</div><div>Балл</div><div>Место</div><div>Судья</div><div>Город</div><div>Комментарий</div><div className="text-right">Медиа</div>
               </div>
-              
               <div ref={scrollRef} className="max-h-[300px] overflow-y-auto pr-1 space-y-1.5 scrollbar-hide scroll-smooth">
-                {loading && !initialLoadDone ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="skeleton-row px-4"></div>
-                  ))
-                ) : filteredLiveEntries.length > 0 ? (
-                  filteredLiveEntries.map((item) => (
-                    <LiveEntryRow 
-                      key={`${item.firestoreId}-${item.participantIdx}`}
-                      item={item} 
-                      onOpen={openFromStream} 
-                    />
+                {filteredLiveEntries.length > 0 ? (
+                  filteredLiveEntries.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-[60px_160px_70px_70px_110px_110px_1fr_60px] items-center bg-gray-50/40 rounded-2xl px-4 py-3 text-[11px] hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all">
+                      <div className="text-gray-900">#{item.number}</div>
+                      <div className="text-gray-900 truncate pr-4">{item.discipline}</div>
+                      <div className="text-gray-900 text-[13px]">{item.score}</div>
+                      <div className="text-gray-400">{/* место */}</div>
+                      <div className="truncate pr-4 text-gray-600">{item.judge}</div>
+                      <div className="text-gray-400 truncate pr-4">{item.city}</div>
+                      <div className="text-gray-400 truncate text-[10px] pr-4" title={item.comment || "—"}>{item.comment || "—"}</div>
+                      <div className="flex justify-end">
+                        <button onClick={() => openFromStream(item)} className="flex items-center gap-1.5 text-gray-500 p-2 hover:bg-gray-200 rounded-xl transition-all">
+                          <i data-lucide="image" width="14" height="14"></i>
+                          <span className="text-[10px]">{item.photos.length}</span>
+                        </button>
+                      </div>
+                    </div>
                   ))
                 ) : (
                   <div className="py-16 text-center text-[10px] text-gray-300 uppercase tracking-[0.2em]">Записей не найдено</div>
@@ -836,7 +738,7 @@ ${commentsList || "Нет комментариев."}`;
             </div>
           </div>
         </div>
-        
+
         {/* Фильтр по городам */}
         {cities.length > 1 && (
           <div className="flex justify-center overflow-hidden">
@@ -849,8 +751,8 @@ ${commentsList || "Нет комментариев."}`;
             </div>
           </div>
         )}
-        
-        {/* Итоги по номинациям с оптимизированным рендером */}
+
+        {/* Итоги по номинациям */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {Object.entries(nominationGroups).map(([nomination, participants]) => (
             <div key={nomination} className="bg-white rounded-[32px] p-6 border border-gray-200">
@@ -859,21 +761,37 @@ ${commentsList || "Нет комментариев."}`;
                 <span className="text-[9px] text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">N={participants.length}</span>
               </div>
               <div className="space-y-2">
-                {participants.map((p, pIdx) => (
-                  <AggregatedRow 
-                    key={`${p.number}-${p.discipline}-${p.city}-${p.date?.toISOString()}`}
-                    p={p} 
-                    pIdx={pIdx} 
-                    onOpen={openFromAggregated} 
-                  />
-                ))}
+                {participants.map((p, pIdx) => {
+                  const isFirst = pIdx === 0;
+                  return (
+                    <div key={pIdx} className={`flex justify-between items-center px-5 py-4 rounded-[22px] transition-all ${isFirst ? 'bg-gray-100' : 'bg-gray-50/60'}`}>
+                      <div className="flex flex-col">
+                        <span className={`text-[12px] ${isFirst ? 'text-gray-900' : 'text-gray-700'}`}>№ {p.number}</span>
+                        <span className="text-[8px] text-gray-400 uppercase tracking-widest">{p.city}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] tracking-tight">
+                        <i data-lucide="award" width="14" height="14" className={isFirst ? 'text-gray-700' : 'text-gray-300'} />
+                        {pIdx + 1} МЕСТО
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <span className="text-[15px] tracking-tighter">{p.avgScore.toFixed(1)}</span>
+                          <span className="text-[7px] block text-gray-400 uppercase -mt-1">БАЛЛЫ</span>
+                        </div>
+                        <button onClick={() => openFromAggregated(p)} className="p-2 hover:bg-gray-200 rounded-full transition-all">
+                          <i data-lucide="sparkles" width="16" height="16" className={isFirst ? 'text-gray-700' : 'text-gray-400'} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
         </div>
       </div>
-      
-      {/* Модальные окна */}
+
+      {/* Модальные окна и полноэкранное изображение (без изменений) */}
       {modalMedia && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => { setModalMedia(null); setAiAnalysis(""); }}>
           <div className="bg-white w-full max-w-xl rounded-[40px] overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
@@ -950,7 +868,7 @@ ${commentsList || "Нет комментариев."}`;
           </div>
         </div>
       )}
-      
+
       {fullscreenImage && (
         <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-6" onClick={() => setFullscreenImage(null)}>
           <button className="absolute top-8 right-8 text-white p-2" onClick={() => setFullscreenImage(null)}>
