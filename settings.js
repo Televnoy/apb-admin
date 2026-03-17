@@ -50,7 +50,8 @@ export function Settings({ show, onClose, adminDeviceId }) {
   const [judges, setJudges] = React.useState([]);
   const [loadingJudges, setLoadingJudges] = React.useState(false);
   const [generating, setGenerating] = React.useState(false);
-  const [toast, setToast] = React.useState(null); // { message, type }
+  const [toast, setToast] = React.useState(null);
+  const [confirmDelete, setConfirmDelete] = React.useState(null);
 
   React.useEffect(() => {
     if (show) {
@@ -117,15 +118,13 @@ export function Settings({ show, onClose, adminDeviceId }) {
   };
 
   const handleDeleteKey = async (judgeKey) => {
-    if (window.confirm(`Вы уверены, что хотите удалить ключ ${judgeKey}? Это действие нельзя отменить.`)) {
-      try {
-        await deleteJudgeKey(judgeKey);
-        setJudges(prev => prev.filter(j => j.key !== judgeKey));
-        showToast('Ключ удалён');
-      } catch (err) {
-        console.error('Ошибка удаления ключа:', err);
-        showToast('Ошибка удаления', 'error');
-      }
+    try {
+      await deleteJudgeKey(judgeKey);
+      setJudges(prev => prev.filter(j => j.key !== judgeKey));
+      showToast('Ключ удалён');
+    } catch (err) {
+      console.error('Ошибка удаления ключа:', err);
+      showToast('Ошибка удаления', 'error');
     }
   };
 
@@ -169,6 +168,48 @@ export function Settings({ show, onClose, adminDeviceId }) {
   }, [pushEnabled, adminDeviceId]);
 
   if (!show) return null;
+
+  // Кастомное модальное окно подтверждения удаления
+  const confirmModal = confirmDelete ? React.createElement(
+    'div',
+    {
+      className: 'fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/60',
+      onClick: () => setConfirmDelete(null)
+    },
+    React.createElement(
+      'div',
+      {
+        className: 'bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl',
+        onClick: e => e.stopPropagation()
+      },
+      React.createElement('h3', { className: 'text-lg font-medium mb-2' }, 'Подтвердите удаление'),
+      React.createElement('p', { className: 'text-sm text-gray-600 mb-4' },
+        `Вы действительно хотите удалить ключ "${confirmDelete.displayName || confirmDelete.key}"?`
+      ),
+      React.createElement('div', { className: 'flex gap-3 justify-end' },
+        React.createElement('button', {
+          className: 'px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition',
+          onClick: () => setConfirmDelete(null)
+        }, 'Отмена'),
+        React.createElement('button', {
+          className: 'px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition',
+          onClick: () => {
+            handleDeleteKey(confirmDelete.key);
+            setConfirmDelete(null);
+          }
+        }, 'Удалить')
+      )
+    )
+  ) : null;
+
+  // Toast-уведомление по центру экрана
+  const toastElement = toast ? React.createElement(
+    'div',
+    { className: 'fixed inset-0 z-[300] flex items-center justify-center pointer-events-none' },
+    React.createElement('div', {
+      className: 'px-6 py-3 rounded-full shadow-2xl text-[11px] font-medium uppercase tracking-wider bg-black text-white'
+    }, toast.message)
+  ) : null;
 
   return React.createElement(
     'div',
@@ -257,7 +298,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
                     React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Город'),
                     React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'ID устройства'),
                     React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Отвязать'),
-                    React.createElement('th', { className: 'px-4 py-2 text-left font-medium text-gray-500' }, 'Действия')
+                    React.createElement('th', { className: 'px-4 py-2 text-center font-medium text-gray-500' }, 'Действия')
                   )
                 ),
                 React.createElement(
@@ -310,12 +351,12 @@ export function Settings({ show, onClose, adminDeviceId }) {
                           ),
                           React.createElement(
                             'td',
-                            { className: 'px-4 py-3' },
+                            { className: 'px-4 py-3 text-center' },
                             React.createElement(
                               'button',
                               {
-                                onClick: () => handleDeleteKey(judge.key),
-                                className: 'text-gray-400 hover:text-red-600 transition',
+                                onClick: () => setConfirmDelete(judge),
+                                className: 'text-gray-400 hover:text-red-600 transition inline-flex items-center justify-center',
                                 title: 'Удалить ключ'
                               },
                               React.createElement(DeleteIcon, { size: 16 })
@@ -340,16 +381,13 @@ export function Settings({ show, onClose, adminDeviceId }) {
             generating ? 'Генерация...' : 'Сгенерировать ключ'
           )
         )
-      ),
-
-      // Toast-уведомление — всегда чёрный фон
-      toast && React.createElement(
-        'div',
-        {
-          className: 'fixed top-20 left-1/2 transform -translate-x-1/2 z-[250] px-6 py-3 rounded-full shadow-2xl text-[11px] font-medium uppercase tracking-wider bg-black text-white'
-        },
-        toast.message
       )
-    )
+    ),
+
+    // Toast-уведомление (центрированное)
+    toastElement,
+
+    // Кастомное модальное окно подтверждения удаления
+    confirmModal
   );
 }
