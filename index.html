@@ -100,10 +100,12 @@ import { db, messaging } from '/apb-admin/firebase-init.js';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { onMessage } from 'firebase/messaging';
 import { Settings } from '/apb-admin/settings.js';
+
 const MONTHS = [
 "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
 "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
 ];
+
 function App() {
 const [data, setData] = React.useState([]);
 const [loading, setLoading] = React.useState(true);
@@ -127,16 +129,21 @@ const [adminDeviceId, setAdminDeviceId] = React.useState('');
 const [showPushSettings, setShowPushSettings] = React.useState(false);
 const [progress, setProgress] = React.useState(0);
 const [initialLoadDone, setInitialLoadDone] = React.useState(false);
+// Состояние для пагинации потока
+const [visibleLimit, setVisibleLimit] = React.useState(50);
+
 const scrollRef = React.useRef(null);
 const calendarRef = React.useRef(null);
 const eventTimeoutRef = React.useRef(null);
 const tempEventTimeoutRef = React.useRef(null);
+
 React.useEffect(() => {
 return () => {
 if (eventTimeoutRef.current) clearTimeout(eventTimeoutRef.current);
 if (tempEventTimeoutRef.current) clearTimeout(tempEventTimeoutRef.current);
 };
 }, []);
+
 React.useEffect(() => {
 if (!loading) return;
 let interval = setInterval(() => {
@@ -152,6 +159,7 @@ return next;
 }, 50);
 return () => clearInterval(interval);
 }, [loading]);
+
 const showEvent = (text, isTemporary = false) => {
 if (isTemporary) {
 if (!text) return;
@@ -160,7 +168,7 @@ setCurrentEvent({ id: Date.now(), text: text, isTemporary: true });
 tempEventTimeoutRef.current = setTimeout(() => {
 setCurrentEvent(prev => prev?.isTemporary ? null : prev);
 tempEventTimeoutRef.current = null;
-}, 2000); // 2 секунды для временных событий (загрузка)
+}, 2000);
 } else {
 if (eventTimeoutRef.current) clearTimeout(eventTimeoutRef.current);
 setCurrentEvent({ id: Date.now(), text, isTemporary: false });
@@ -171,6 +179,7 @@ eventTimeoutRef.current = null;
 }, 30000);
 }
 };
+
 const handleDashboardClick = () => {
 if (currentEvent && !currentEvent.isTemporary) {
 if (eventTimeoutRef.current) clearTimeout(eventTimeoutRef.current);
@@ -185,12 +194,14 @@ showEvent(lastEventText, true);
 }
 }
 };
+
 React.useEffect(() => {
 window.addEventListener('beforeinstallprompt', (e) => {
 e.preventDefault();
 setDeferredPrompt(e);
 });
 }, []);
+
 React.useEffect(() => {
 const handleClickOutside = (event) => {
 if (calendarRef.current && !calendarRef.current.contains(event.target)) {
@@ -200,12 +211,14 @@ setShowCalendar(false);
 document.addEventListener('mousedown', handleClickOutside);
 return () => document.removeEventListener('mousedown', handleClickOutside);
 }, []);
+
 const handleInstallClick = async () => {
 if (!deferredPrompt) return;
 deferredPrompt.prompt();
 const { outcome } = await deferredPrompt.userChoice;
 if (outcome === 'accepted') setDeferredPrompt(null);
 };
+
 const handleUpdateClick = () => {
 if (navigator.serviceWorker && navigator.serviceWorker.controller) {
 navigator.serviceWorker.controller.postMessage({ action: 'skipWaiting' });
@@ -215,6 +228,7 @@ window.location.reload();
 });
 setShowUpdateNotification(false);
 };
+
 React.useEffect(() => {
 if ('serviceWorker' in navigator) {
 navigator.serviceWorker.register('/apb-admin/a-sw.js')
@@ -236,6 +250,7 @@ setShowUpdateNotification(true);
 .catch(err => console.log('SW registration failed:', err));
 }
 }, []);
+
 React.useEffect(() => {
 let deviceId = localStorage.getItem('admin_device_id');
 if (!deviceId) {
@@ -244,6 +259,7 @@ localStorage.setItem('admin_device_id', deviceId);
 }
 setAdminDeviceId(deviceId);
 }, []);
+
 React.useEffect(() => {
 const unsubscribe = onMessage(messaging, (payload) => {
 console.log('Message received in foreground:', payload);
@@ -262,6 +278,8 @@ showEvent(text);
 });
 return () => unsubscribe();
 }, []);
+
+// Подписка на Firestore
 React.useEffect(() => {
 let mounted = true;
 const evaluationsQuery = query(
@@ -277,32 +295,10 @@ firestoreId: doc.id,
 }));
 console.log('🔥 Получены оценки:', evaluations.length);
 
-// ЛОГИКА ЗАГРУЗКИ И ОБНОВЛЕНИЯ
+// Используем функциональное обновление, чтобы всегда работать с актуальным data
+setData(prevData => {
 if (!initialLoadDone) {
-    // Первая загрузка
-    setData(evaluations);
-    setInitialLoadDone(true);
-    setLoading(false);
-    
-    // Показываем "Данные загружены" на 2 секунды
-    showEvent('Данные загружены', true);
-} else {
-    // Последующие обновления
-    const newEvals = evaluations.filter(newItem =>
-        !data.some(oldItem => oldItem.firestoreId === newItem.firestoreId)
-    );
-    
-    if (newEvals.length > 0) {
-        newEvals.forEach(item => {
-            const judge = item.judgeName || 'Судья';
-            const participantNumbers = item.participants?.map(p => p.number).join(', ') || '—';
-            const text = `${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`;
-            showEvent(text);
-        });
-    }
-    setData(evaluations);
-}
-
+// Первая загрузка
 if (evaluations.length > 0) {
 const latest = evaluations[0];
 if (latest.createdAt) {
@@ -311,6 +307,26 @@ setSelectedDate({ month: lastDate.getMonth(), year: lastDate.getFullYear() });
 setSelectedDay(lastDate.getDate());
 }
 }
+setInitialLoadDone(true);
+setLoading(false);
+showEvent('Данные загружены', true);
+return evaluations;
+} else {
+// Последующие обновления: ищем новые элементы
+const newEvals = evaluations.filter(newItem =>
+!prevData.some(oldItem => oldItem.firestoreId === newItem.firestoreId)
+);
+if (newEvals.length > 0) {
+newEvals.forEach(item => {
+const judge = item.judgeName || 'Судья';
+const participantNumbers = item.participants?.map(p => p.number).join(', ') || '—';
+const text = `${judge} оценил участника №${participantNumbers} в номинации ${item.discipline || '—'}`;
+showEvent(text);
+});
+}
+return evaluations;
+}
+});
 }, (error) => {
 console.error("❌ Snapshot error:", error);
 if (mounted) {
@@ -321,18 +337,17 @@ return () => {
 mounted = false;
 unsubscribe();
 };
-}, [initialLoadDone, data]);
-React.useEffect(() => {
-if (scrollRef.current) {
-scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-}
-}, [data, selectedCity, selectedDate, selectedDay]);
+}, []); // Пустые зависимости, чтобы подписка создалась один раз
+
+// Эффект для обновления иконок Lucide
 React.useEffect(() => {
 if (window.lucide) {
 lucide.createIcons();
 }
 });
-const getFilteredByDate = () => {
+
+// Мемоизированные вычисления
+const getFilteredByDate = React.useCallback(() => {
 return data.filter(item => {
 if (!item.createdAt) return false;
 const date = item.createdAt.toDate();
@@ -340,8 +355,9 @@ if (date.getMonth() !== selectedDate.month || date.getFullYear() !== selectedDat
 if (selectedDay !== null && date.getDate() !== selectedDay) return false;
 return true;
 });
-};
-const getFlatList = () => {
+}, [data, selectedDate, selectedDay]);
+
+const allEntriesRaw = React.useMemo(() => {
 const list = [];
 const filteredData = getFilteredByDate();
 filteredData.forEach(item => {
@@ -368,8 +384,9 @@ const timeB = b.createdAt ? b.createdAt.toDate().getTime() : 0;
 return timeA - timeB;
 });
 return list;
-};
-const getAggregatedRanked = () => {
+}, [getFilteredByDate]);
+
+const aggregatedRanked = React.useMemo(() => {
 const filteredData = getFilteredByDate();
 const groups = {};
 filteredData.forEach(item => {
@@ -405,14 +422,19 @@ allComments: g.comments,
 allPhotos: [...new Set(g.photos)]
 }));
 return aggregated.sort((a, b) => b.avgScore - a.avgScore);
-};
-const allEntriesRaw = getFlatList();
-const aggregatedRanked = getAggregatedRanked();
-const cities = ['Все города', ...new Set(allEntriesRaw.map(e => e.city))];
-const filteredLiveEntries = selectedCity === 'Все города'
+}, [getFilteredByDate]);
+
+const cities = React.useMemo(() => {
+return ['Все города', ...new Set(allEntriesRaw.map(e => e.city))];
+}, [allEntriesRaw]);
+
+const filteredLiveEntries = React.useMemo(() => {
+return selectedCity === 'Все города'
 ? allEntriesRaw
 : allEntriesRaw.filter(e => e.city === selectedCity);
-const getNominationGroups = () => {
+}, [allEntriesRaw, selectedCity]);
+
+const nominationGroups = React.useMemo(() => {
 const filteredAggregated = selectedCity === 'Все города'
 ? aggregatedRanked
 : aggregatedRanked.filter(g => g.city === selectedCity);
@@ -425,8 +447,9 @@ Object.keys(groups).forEach(key => {
 groups[key].sort((a, b) => b.avgScore - a.avgScore);
 });
 return groups;
-};
-const getDaysWithData = () => {
+}, [aggregatedRanked, selectedCity]);
+
+const getDaysWithData = React.useCallback(() => {
 const days = new Set();
 data.forEach(item => {
 if (!item.createdAt) return;
@@ -436,7 +459,8 @@ days.add(date.getDate());
 }
 });
 return Array.from(days).sort((a, b) => a - b);
-};
+}, [data, selectedDate]);
+
 const analyzeComments = async (target, mode) => {
 setIsAnalyzing(true);
 setAiAnalysis("");
@@ -496,6 +520,7 @@ setErrorInfo("Ошибка при запросе к YandexGPT.");
 setIsAnalyzing(false);
 }
 };
+
 const openFromStream = (item) => {
 setModalMedia({
 type: 'single',
@@ -511,6 +536,7 @@ comment: item.comment
 });
 analyzeComments(item, 'single');
 };
+
 const openFromAggregated = (group) => {
 setModalMedia({
 type: 'group',
@@ -523,6 +549,7 @@ comments: group.allComments
 });
 analyzeComments(group, 'group');
 };
+
 const copyReportToClipboard = () => {
 if (!modalMedia) return;
 let commentsList = '';
@@ -545,6 +572,7 @@ alert("Отчёт скопирован в буфер обмена");
 alert("Не удалось скопировать");
 });
 };
+
 const changeMonth = (direction) => {
 setSelectedDate(prev => {
 let newMonth = prev.month + direction;
@@ -555,10 +583,12 @@ return { month: newMonth, year: newYear };
 });
 setSelectedDay(null);
 };
+
 const daysWithData = getDaysWithData();
 const dateDisplay = selectedDay
 ? `${selectedDay} ${MONTHS[selectedDate.month]} ${selectedDate.year}`
 : `${MONTHS[selectedDate.month]} ${selectedDate.year}`;
+
 if (loading) return (
 <div className="min-h-screen bg-white flex items-center justify-center">
 <div className="preloader-container fade-in-ui">
@@ -570,6 +600,7 @@ if (loading) return (
 </div>
 </div>
 );
+
 return (
 <div className="min-h-screen bg-gray-50 font-sans text-gray-900 select-none pb-12">
 {/* Баннеры установки и обновления */}
@@ -585,10 +616,10 @@ return (
 <button onClick={handleUpdateClick} className="bg-white text-black px-3 py-1 rounded-full text-[9px]">ОБНОВИТЬ</button>
 </div>
 )}
+
 {/* Липкая верхняя панель с дашбордом и кнопкой настроек */}
 <div className="sticky top-0 z-40 w-full pt-2 pb-4 px-3 bg-gray-50/80 backdrop-blur-sm">
 <div className="relative max-w-5xl mx-auto">
-{/* Кнопка настроек (нижний слой) */}
 <div className="absolute right-0 top-0 z-10">
 <button
 onClick={() => setShowPushSettings(true)}
@@ -597,7 +628,6 @@ className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-ce
 <i data-lucide="settings" width="16" height="16" />
 </button>
 </div>
-{/* Дашборд (верхний слой) */}
 <div className="absolute left-1/2 transform -translate-x-1/2 z-20 max-w-[90%] sm:max-w-md">
 <div
 onClick={handleDashboardClick}
@@ -616,8 +646,10 @@ style={{ maxWidth: currentEvent ? '500px' : '40px' }}
 </div>
 </div>
 </div>
+
 {/* Окно настроек */}
 <Settings show={showPushSettings} onClose={() => setShowPushSettings(false)} adminDeviceId={adminDeviceId} />
+
 {/* Основной интерфейс */}
 <div className="max-w-5xl mx-auto px-4 space-y-5 mt-2">
 {/* Календарь */}
@@ -672,6 +704,7 @@ className={`aspect-square rounded-lg text-[10px] flex items-center justify-cente
 </div>
 )}
 </div>
+
 {/* Поток результатов */}
 <div className="bg-white rounded-[32px] p-6 border border-gray-200 overflow-hidden">
 <div className="flex justify-between items-center mb-5">
@@ -690,8 +723,7 @@ className={`aspect-square rounded-lg text-[10px] flex items-center justify-cente
 <div>№</div><div>Номинация</div><div>Балл</div><div>Место</div><div>Судья</div><div>Город</div><div>Комментарий</div><div className="text-right">Медиа</div>
 </div>
 <div ref={scrollRef} className="max-h-[300px] overflow-y-auto pr-1 space-y-1.5 scrollbar-hide scroll-smooth">
-{filteredLiveEntries.length > 0 ? (
-filteredLiveEntries.map((item, idx) => (
+{filteredLiveEntries.slice(0, visibleLimit).map((item, idx) => (
 <div key={idx} className="grid grid-cols-[60px_160px_70px_70px_110px_110px_1fr_60px] items-center bg-gray-50/40 rounded-2xl px-4 py-3 text-[11px] hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all">
 <div className="text-gray-900">#{item.number}</div>
 <div className="text-gray-900 truncate pr-4">{item.discipline}</div>
@@ -707,14 +739,23 @@ filteredLiveEntries.map((item, idx) => (
 </button>
 </div>
 </div>
-))
-) : (
+))}
+{filteredLiveEntries.length > visibleLimit && (
+<button
+onClick={() => setVisibleLimit(prev => prev + 50)}
+className="w-full py-3 text-[10px] text-gray-500 uppercase tracking-wider hover:text-gray-900 transition-colors"
+>
+Загрузить ещё
+</button>
+)}
+{filteredLiveEntries.length === 0 && (
 <div className="py-16 text-center text-[10px] text-gray-300 uppercase tracking-[0.2em]">Записей не найдено</div>
 )}
 </div>
 </div>
 </div>
 </div>
+
 {/* Фильтр по городам */}
 {cities.length > 1 && (
 <div className="flex justify-center overflow-hidden">
@@ -727,9 +768,10 @@ filteredLiveEntries.map((item, idx) => (
 </div>
 </div>
 )}
+
 {/* Итоги по номинациям */}
 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-{Object.entries(getNominationGroups()).map(([nomination, participants]) => (
+{Object.entries(nominationGroups).map(([nomination, participants]) => (
 <div key={nomination} className="bg-white rounded-[32px] p-6 border border-gray-200">
 <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-4">
 <h4 className="text-[12px] tracking-tight leading-tight uppercase w-3/4">{nomination}</h4>
@@ -765,6 +807,7 @@ return (
 ))}
 </div>
 </div>
+
 {/* Модальные окна и полноэкранное изображение (без изменений) */}
 {modalMedia && (
 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => { setModalMedia(null); setAiAnalysis(""); }}>
@@ -856,6 +899,7 @@ modalMedia.comments.map((c, idx) => (
 </div>
 );
 }
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
 </script>
