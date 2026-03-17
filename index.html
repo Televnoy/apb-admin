@@ -16,7 +16,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600&display=swap" rel="stylesheet">
 <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
-<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <!-- Import map for Firebase modules -->
 <script type="importmap">
@@ -51,18 +50,17 @@ text-align: center;
 width: 100%;
 max-width: 280px;
 }
-.preloader-text {
+.preloader-stage {
 font-weight: 200;
 font-size: 0.85rem;
 letter-spacing: 0.15em;
 color: #000;
-margin-bottom: 24px;
+margin-bottom: 20px;
 text-transform: lowercase;
-animation: blink 2s ease-in-out infinite;
 }
-@keyframes blink {
-0%, 100% { opacity: 1; }
-50% { opacity: 0.3; }
+.preloader-stage-name {
+font-weight: 400;
+color: #333;
 }
 .preloader-progress-container {
 width: 100%;
@@ -75,7 +73,7 @@ position: relative;
 height: 100%;
 width: 0%;
 background-color: #000;
-transition: width 0.1s linear;
+transition: width 0.2s ease-out;
 }
 .preloader-percentage {
 font-weight: 100;
@@ -106,10 +104,84 @@ const MONTHS = [
   "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
 ];
 
+// ========== Встроенные SVG-иконки (больше никакой зависимости от Lucide) ==========
+const IconBell = ({ size = 16, className = "" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+  </svg>
+);
+const IconSettings = ({ size = 16, className = "" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H5.78a1.65 1.65 0 0 0-1.51 1 1.65 1.65 0 0 0 .33 1.82l.04.04A10 10 0 0 0 12 17.66a10 10 0 0 0 6.36-2.62z" /><path d="M16.5 7.5 12 12M12 12 7.5 7.5" />
+  </svg>
+);
+const IconCalendar = ({ size = 16, className = "" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+);
+const IconChevronDown = ({ size = 14, className = "" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+const IconChevronLeft = ({ size = 18, className = "" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+);
+const IconChevronRight = ({ size = 18, className = "" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+);
+const IconImage = ({ size = 14, className = "" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
+  </svg>
+);
+const IconAward = ({ size = 14, className = "" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="8" r="7" /><polyline points="8 21 12 17 16 21" />
+  </svg>
+);
+const IconSparkles = ({ size = 16, className = "" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 3v4M8 5l2 2M16 5l-2 2M5 8l2 2M3 12h4M5 16l2-2M8 19l2-2M12 21v-4M16 19l-2-2M19 16l-2-2M21 12h-4M19 8l-2 2M16 5l-2 2" />
+  </svg>
+);
+const IconCopy = ({ size = 20, className = "" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+);
+const IconX = ({ size = 20, className = "" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+const IconMessageSquare = ({ size = 16, className = "" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+);
+const IconLoader = ({ size = 18, className = "" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`animate-spin ${className}`}>
+    <line x1="12" y1="2" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="22" /><line x1="4.93" y1="4.93" x2="7.76" y2="7.76" /><line x1="16.24" y1="16.24" x2="19.07" y2="19.07" /><line x1="2" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="22" y2="12" /><line x1="4.93" y1="19.07" x2="7.76" y2="16.24" /><line x1="16.24" y1="7.76" x2="19.07" y2="4.93" />
+  </svg>
+);
+const IconMaximize = ({ size = 32, className = "" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
+  </svg>
+);
+
 function App() {
   const [data, setData] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
-  const [progress, setProgress] = React.useState(0);
+  const [stage, setStage] = React.useState('init'); // init, firebase, first-data, ready
+  const [progress, setProgress] = React.useState(10); // 10,30,70,100
+
   const [selectedCity, setSelectedCity] = React.useState('Все города');
   const [selectedDate, setSelectedDate] = React.useState({
     month: new Date().getMonth(),
@@ -134,18 +206,11 @@ function App() {
   const eventTimeoutRef = React.useRef(null);
   const tempEventTimeoutRef = React.useRef(null);
 
-  // Эффект для анимации прогресса (только пока loading = true)
+  // Этапы загрузки (прогресс управляется вручную через setStage)
   React.useEffect(() => {
-    if (!loading) return;
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        // Плавно приближаемся к 99%
-        const next = prev + (99 - prev) * 0.02;
-        return next > 99 ? 99 : next;
-      });
-    }, 100);
-    return () => clearInterval(interval);
-  }, [loading]);
+    // Начальный этап уже init, прогресс 10
+    // При подключении к Firebase перейдём на firebase
+  }, []);
 
   React.useEffect(() => {
     return () => {
@@ -273,10 +338,14 @@ function App() {
     return () => unsubscribe();
   }, [showEvent]);
 
-  // Подписка на Firestore (один раз, без перезапуска)
+  // Подписка на Firestore с управлением этапами
   React.useEffect(() => {
     let mounted = true;
     let isFirstLoad = true;
+
+    // Переходим к этапу firebase (30%)
+    setStage('firebase');
+    setProgress(30);
 
     const evaluationsQuery = query(
       collection(db, 'evaluations'),
@@ -293,10 +362,18 @@ function App() {
       }));
       console.log('🔥 Получены оценки:', evaluations.length);
 
+      if (isFirstLoad) {
+        // Первая загрузка – переходим к first-data (70%)
+        setStage('first-data');
+        setProgress(70);
+      }
+
       setData(prevData => {
         if (isFirstLoad) {
           isFirstLoad = false;
-          // Первая загрузка — скрываем прелоадер
+          // После установки данных – ready (100%)
+          setStage('ready');
+          setProgress(100);
           setLoading(false);
           showEvent('Данные загружены', true);
           return evaluations;
@@ -336,7 +413,7 @@ function App() {
       mounted = false;
       unsubscribe();
     };
-  }, [showEvent]); // showEvent стабильна, эффект не перезапустится без необходимости
+  }, [showEvent]);
 
   // ========== Мемоизированные производные данные ==========
   const allEntriesRaw = React.useMemo(() => {
@@ -448,7 +525,7 @@ function App() {
     return Array.from(days).sort((a, b) => a - b);
   }, [data, selectedDate.month, selectedDate.year]);
 
-  // ========== Вспомогательные функции (без изменений) ==========
+  // ========== Вспомогательные функции ==========
   const analyzeComments = async (target, mode) => {
     setIsAnalyzing(true);
     setAiAnalysis("");
@@ -576,12 +653,20 @@ ${commentsList || "Нет комментариев."}`;
     ? `${selectedDay} ${MONTHS[selectedDate.month]} ${selectedDate.year}`
     : `${MONTHS[selectedDate.month]} ${selectedDate.year}`;
 
-  // Прелоадер с прогресс-баром
+  // Прелоадер с поэтапным отображением
   if (loading) {
+    const stageLabels = {
+      init: 'инициализация',
+      firebase: 'подключение к базе',
+      'first-data': 'получение данных',
+      ready: 'обработка'
+    };
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="preloader-container fade-in-ui">
-          <div className="preloader-text">загрузка данных...</div>
+          <div className="preloader-stage">
+            <span className="preloader-stage-name">{stageLabels[stage]}</span>
+          </div>
           <div className="preloader-progress-container">
             <div className="preloader-progress-bar" style={{ width: progress + '%' }}></div>
           </div>
@@ -615,7 +700,7 @@ ${commentsList || "Нет комментариев."}`;
               onClick={() => setShowPushSettings(true)}
               className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center"
             >
-              <i data-lucide="settings" width="16" height="16" />
+              <IconSettings size={16} />
             </button>
           </div>
           <div className="absolute left-1/2 transform -translate-x-1/2 z-20 max-w-[90%] sm:max-w-md">
@@ -625,7 +710,7 @@ ${commentsList || "Нет комментариев."}`;
               style={{ maxWidth: currentEvent ? '500px' : '40px' }}
             >
               <div className="p-2 flex-shrink-0">
-                <i data-lucide="bell" width="16" height="16" className="text-gray-400" />
+                <IconBell size={16} className="text-gray-400" />
               </div>
               {currentEvent && (
                 <div className="whitespace-nowrap overflow-hidden text-ellipsis py-2 pr-3 text-[11px] font-medium event-text">
@@ -649,23 +734,23 @@ ${commentsList || "Нет комментариев."}`;
             className="w-full bg-white rounded-2xl p-3 border border-gray-200 flex items-center justify-between"
           >
             <div className="flex items-center gap-2 text-gray-400">
-              <i data-lucide="calendar" width="16" height="16"></i>
+              <IconCalendar size={16} />
               <span className="text-[9px] uppercase tracking-widest">Дата:</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-gray-900">{dateDisplay}</span>
-              <i data-lucide="chevron-down" width="14" height="14" className={`text-gray-400 transition-transform ${showCalendar ? 'rotate-180' : ''}`}></i>
+              <IconChevronDown size={14} className={`text-gray-400 transition-transform ${showCalendar ? 'rotate-180' : ''}`} />
             </div>
           </button>
           {showCalendar && (
             <div className="absolute left-0 right-0 mt-2 bg-white rounded-2xl border border-gray-200 p-4 z-50">
               <div className="flex items-center justify-between mb-4">
                 <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-gray-100 rounded-lg">
-                  <i data-lucide="chevron-left" width="18" height="18"></i>
+                  <IconChevronLeft size={18} />
                 </button>
                 <div className="text-[12px] uppercase">{MONTHS[selectedDate.month]} {selectedDate.year}</div>
                 <button onClick={() => changeMonth(1)} className="p-2 hover:bg-gray-100 rounded-lg">
-                  <i data-lucide="chevron-right" width="18" height="18"></i>
+                  <IconChevronRight size={18} />
                 </button>
               </div>
               <div className="grid grid-cols-7 gap-1 text-center text-[9px] text-gray-400 mb-2">
@@ -725,7 +810,7 @@ ${commentsList || "Нет комментариев."}`;
                       <div className="text-gray-400 truncate text-[10px] pr-4" title={item.comment || "—"}>{item.comment || "—"}</div>
                       <div className="flex justify-end">
                         <button onClick={() => openFromStream(item)} className="flex items-center gap-1.5 text-gray-500 p-2 hover:bg-gray-200 rounded-xl transition-all">
-                          <i data-lucide="image" width="14" height="14"></i>
+                          <IconImage size={14} />
                           <span className="text-[10px]">{item.photos.length}</span>
                         </button>
                       </div>
@@ -770,7 +855,7 @@ ${commentsList || "Нет комментариев."}`;
                         <span className="text-[8px] text-gray-400 uppercase tracking-widest">{p.city}</span>
                       </div>
                       <div className="flex items-center gap-2 text-[11px] tracking-tight">
-                        <i data-lucide="award" width="14" height="14" className={isFirst ? 'text-gray-700' : 'text-gray-300'} />
+                        <IconAward size={14} className={isFirst ? 'text-gray-700' : 'text-gray-300'} />
                         {pIdx + 1} МЕСТО
                       </div>
                       <div className="flex items-center gap-3">
@@ -779,7 +864,7 @@ ${commentsList || "Нет комментариев."}`;
                           <span className="text-[7px] block text-gray-400 uppercase -mt-1">БАЛЛЫ</span>
                         </div>
                         <button onClick={() => openFromAggregated(p)} className="p-2 hover:bg-gray-200 rounded-full transition-all">
-                          <i data-lucide="sparkles" width="16" height="16" className={isFirst ? 'text-gray-700' : 'text-gray-400'} />
+                          <IconSparkles size={16} className={isFirst ? 'text-gray-700' : 'text-gray-400'} />
                         </button>
                       </div>
                     </div>
@@ -791,7 +876,7 @@ ${commentsList || "Нет комментариев."}`;
         </div>
       </div>
 
-      {/* Модальные окна и полноэкранное изображение (без изменений) */}
+      {/* Модальные окна */}
       {modalMedia && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => { setModalMedia(null); setAiAnalysis(""); }}>
           <div className="bg-white w-full max-w-xl rounded-[40px] overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
@@ -804,22 +889,22 @@ ${commentsList || "Нет комментариев."}`;
               </div>
               <div className="flex gap-2">
                 <button onClick={copyReportToClipboard} className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-all" title="Копировать отчёт">
-                  <i data-lucide="copy" width="20" height="20"></i>
+                  <IconCopy size={20} />
                 </button>
                 <button onClick={() => setModalMedia(null)} className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-all">
-                  <i data-lucide="x" width="20" height="20"></i>
+                  <IconX size={20} />
                 </button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
               <div className="bg-gray-50 border border-gray-200 rounded-3xl p-6 min-h-[100px] flex flex-col justify-center">
                 <div className="flex items-center gap-2 mb-3">
-                  <i data-lucide="sparkles" width="16" height="16" className="text-gray-500"></i>
+                  <IconSparkles size={16} className="text-gray-500" />
                   <span className="text-[10px] text-gray-500 tracking-[0.15em] uppercase">AI Анализ</span>
                 </div>
                 {isAnalyzing ? (
                   <div className="flex items-center gap-3 py-2">
-                    <i data-lucide="loader-2" width="18" height="18" className="text-gray-500 animate-spin"></i>
+                    <IconLoader size={18} className="text-gray-500" />
                     <span className="text-[12px] text-gray-500 uppercase tracking-widest">Анализируем отзывы...</span>
                   </div>
                 ) : (
@@ -828,7 +913,7 @@ ${commentsList || "Нет комментариев."}`;
               </div>
               <div className="bg-gray-50 rounded-3xl p-6 border border-gray-200">
                 <div className="flex items-center gap-2 mb-4">
-                  <i data-lucide="message-square" width="16" height="16" className="text-gray-500"></i>
+                  <IconMessageSquare size={16} className="text-gray-500" />
                   <span className="text-[10px] text-gray-500 tracking-[0.15em] uppercase">
                     {modalMedia.type === 'single' ? 'Комментарий судьи' : 'Комментарии судей'}
                   </span>
@@ -858,7 +943,7 @@ ${commentsList || "Нет комментариев."}`;
                     <div key={i} className="group relative aspect-[4/5] bg-gray-100 rounded-[28px] overflow-hidden border border-gray-200 cursor-pointer" onClick={() => setFullscreenImage({ url, index: i })}>
                       <img src={url} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                       <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <i data-lucide="maximize-2" width="32" height="32" className="text-white"></i>
+                        <IconMaximize size={32} className="text-white" />
                       </div>
                     </div>
                   ))}
@@ -872,7 +957,7 @@ ${commentsList || "Нет комментариев."}`;
       {fullscreenImage && (
         <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-6" onClick={() => setFullscreenImage(null)}>
           <button className="absolute top-8 right-8 text-white p-2" onClick={() => setFullscreenImage(null)}>
-            <i data-lucide="x" width="32" height="32"></i>
+            <IconX size={32} />
           </button>
           <img src={fullscreenImage.url} className="max-w-full max-h-full object-contain" alt="View" />
           <div className="absolute bottom-10 px-8 py-3 bg-white/10 rounded-full text-white/80 text-[10px] tracking-widest uppercase">
