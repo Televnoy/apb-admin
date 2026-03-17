@@ -1,23 +1,44 @@
 import { db, messaging, saveFcmToken, removeFcmToken, getJudges, updateJudgeDevice, createJudgeKey, deleteJudgeKey } from '/apb-admin/firebase-init.js';
 import { getToken } from 'firebase/messaging';
 
-// Встроенные SVG-иконки (без зависимости от Lucide)
-const CopyIcon = ({ size = 16, className = '' }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={size} height={size} fill="currentColor" className={className}>
-    <path d="M17 3h-6C8.8 3 7 4.8 7 7c-2.2 0-4 1.8-4 4v6c0 2.2 1.8 4 4 4h6c2.2 0 4-1.8 4-4 2.2 0 4-1.8 4-4V7c0-2.2-1.8-4-4-4m-2 14c0 1.1-.9 2-2 2H7c-1.1 0-2-.9-2-2v-6c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2zm4-4c0 1.1-.9 2-2 2v-4c0-2.2-1.8-4-4-4H9c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2z"/>
-  </svg>
+// Встроенные SVG-иконки (вместо Lucide)
+const CloseIcon = ({ size = 24, className = '' }) => (
+  React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg',
+    width: size,
+    height: size,
+    viewBox: '0 0 32 32',
+    fill: 'currentColor',
+    className: className
+  },
+    React.createElement('path', { d: 'M10.05 23.95a1 1 0 0 0 1.414 0L17 18.414l5.536 5.536a1 1 0 0 0 1.414-1.414L18.414 17l5.536-5.536a1 1 0 0 0-1.414-1.414L17 15.586l-5.536-5.536a1 1 0 0 0-1.414 1.414L15.586 17l-5.536 5.536a1 1 0 0 0 0 1.414' })
+  )
+);
+
+const CopyIcon = ({ size = 14, className = '' }) => (
+  React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg',
+    width: size,
+    height: size,
+    viewBox: '0 0 24 24',
+    fill: 'currentColor',
+    className: className
+  },
+    React.createElement('path', { d: 'M17 3h-6C8.8 3 7 4.8 7 7c-2.2 0-4 1.8-4 4v6c0 2.2 1.8 4 4 4h6c2.2 0 4-1.8 4-4 2.2 0 4-1.8 4-4V7c0-2.2-1.8-4-4-4m-2 14c0 1.1-.9 2-2 2H7c-1.1 0-2-.9-2-2v-6c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2zm4-4c0 1.1-.9 2-2 2v-4c0-2.2-1.8-4-4-4H9c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2z' })
+  )
 );
 
 const DeleteIcon = ({ size = 16, className = '' }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={size} height={size} fill="currentColor" className={className}>
-    <path d="M19 5.25h-4.25V5c0-1.517-1.233-2.75-2.75-2.75S9.25 3.483 9.25 5v.25H5a.75.75 0 0 0 0 1.5h.25V19A2.75 2.75 0 0 0 8 21.75h8A2.75 2.75 0 0 0 18.75 19V6.75H19a.75.75 0 0 0 0-1.5M10.75 5c0-.689.561-1.25 1.25-1.25s1.25.561 1.25 1.25v.25h-2.5zm6.5 14c0 .689-.561 1.25-1.25 1.25H8c-.689 0-1.25-.561-1.25-1.25V6.75h10.5zm-4-3v-5a.75.75 0 0 1 1.5 0v5a.75.75 0 0 1-1.5 0m-4 0v-5a.75.75 0 0 1 1.5 0v5a.75.75 0 0 1-1.5 0"/>
-  </svg>
-);
-
-const CloseIcon = ({ size = 24, className = '' }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill="currentColor" className={className}>
-    <path d="M10.05 23.95a1 1 0 0 0 1.414 0L17 18.414l5.536 5.536a1 1 0 0 0 1.414-1.414L18.414 17l5.536-5.536a1 1 0 0 0-1.414-1.414L17 15.586l-5.536-5.536a1 1 0 0 0-1.414 1.414L15.586 17l-5.536 5.536a1 1 0 0 0 0 1.414"/>
-  </svg>
+  React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg',
+    width: size,
+    height: size,
+    viewBox: '0 0 24 24',
+    fill: 'currentColor',
+    className: className
+  },
+    React.createElement('path', { d: 'M19 5.25h-4.25V5c0-1.517-1.233-2.75-2.75-2.75S9.25 3.483 9.25 5v.25H5a.75.75 0 0 0 0 1.5h.25V19A2.75 2.75 0 0 0 8 21.75h8A2.75 2.75 0 0 0 18.75 19V6.75H19a.75.75 0 0 0 0-1.5M10.75 5c0-.689.561-1.25 1.25-1.25s1.25.561 1.25 1.25v.25h-2.5zm6.5 14c0 .689-.561 1.25-1.25 1.25H8c-.689 0-1.25-.561-1.25-1.25V6.75h10.5zm-4-3v-5a.75.75 0 0 1 1.5 0v5a.75.75 0 0 1-1.5 0m-4 0v-5a.75.75 0 0 1 1.5 0v5a.75.75 0 0 1-1.5 0' })
+  )
 );
 
 export function Settings({ show, onClose, adminDeviceId }) {
@@ -32,7 +53,9 @@ export function Settings({ show, onClose, adminDeviceId }) {
   const [toast, setToast] = React.useState(null); // { message, type }
 
   React.useEffect(() => {
-    if (show) loadJudges();
+    if (show) {
+      loadJudges();
+    }
   }, [show]);
 
   const loadJudges = async () => {
@@ -85,12 +108,12 @@ export function Settings({ show, onClose, adminDeviceId }) {
   };
 
   const handleCopyKey = (key) => {
-    navigator.clipboard.writeText(key)
-      .then(() => showToast('Ключ скопирован'))
-      .catch(err => {
-        console.error('Ошибка копирования:', err);
-        showToast('Ошибка копирования', 'error');
-      });
+    navigator.clipboard.writeText(key).then(() => {
+      showToast('Ключ скопирован');
+    }).catch(err => {
+      console.error('Ошибка копирования:', err);
+      showToast('Ошибка копирования', 'error');
+    });
   };
 
   const handleDeleteKey = async (judgeKey) => {
@@ -106,7 +129,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
     }
   };
 
-  // Управление push-уведомлениями при изменении состояния
   React.useEffect(() => {
     if (!adminDeviceId) return;
 
@@ -147,10 +169,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
   }, [pushEnabled, adminDeviceId]);
 
   if (!show) return null;
-
-  // Общий класс для чекбоксов (переключателей)
-  const checkboxClass = "w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-black transition";
-  const thumbClass = "absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5";
 
   return React.createElement(
     'div',
@@ -197,8 +215,8 @@ export function Settings({ show, onClose, adminDeviceId }) {
                 localStorage.setItem('pushEnabled', newValue);
               }
             }),
-            React.createElement('div', { className: checkboxClass }),
-            React.createElement('div', { className: thumbClass })
+            React.createElement('div', { className: 'w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-black transition' }),
+            React.createElement('div', { className: 'absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5' })
           )
         ),
         React.createElement(
@@ -286,8 +304,8 @@ export function Settings({ show, onClose, adminDeviceId }) {
                                 checked: !!judge.deviceId,
                                 onChange: (e) => handleDeviceToggle(judge.key, judge.deviceId, e.target.checked)
                               }),
-                              React.createElement('div', { className: checkboxClass }),
-                              React.createElement('div', { className: thumbClass })
+                              React.createElement('div', { className: 'w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-black transition' }),
+                              React.createElement('div', { className: 'absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5' })
                             )
                           ),
                           React.createElement(
@@ -317,7 +335,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
             {
               onClick: handleGenerateKey,
               disabled: generating,
-              className: 'bg-black text-white px-4 py-2 rounded-full text-[10px] font-medium uppercase tracking-wider hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition'
+              className: 'bg-black text-white px-4 py-2 rounded-full text-[10px] font-medium uppercase tracking-wider hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed'
             },
             generating ? 'Генерация...' : 'Сгенерировать ключ'
           )
