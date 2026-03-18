@@ -59,8 +59,8 @@ const createJudgeKey = async (initialData = {}) => {
 
   const docRef = doc(db, 'judges', newKey);
   await setDoc(docRef, {
-    displayName: initialData.displayName || 'Новый судья',
-    city: initialData.city || 'Не указан',
+    displayName: initialData.displayName || '',
+    city: initialData.city || '',
     deviceId: null,
     createdAt: serverTimestamp()
   });
