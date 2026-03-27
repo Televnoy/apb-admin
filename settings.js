@@ -41,7 +41,7 @@ const DeleteIcon = ({ size = 16, className = '' }) => (
   )
 );
 
-export function Settings({ show, onClose, adminDeviceId }) {
+export function Settings({ show, onClose, adminDeviceId, onSystemPromptChange }) {
   const [pushEnabled, setPushEnabled] = React.useState(() => {
     const saved = localStorage.getItem('pushEnabled');
     return saved === null ? true : saved === 'true';
@@ -53,7 +53,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
   const [toast, setToast] = React.useState(null);
   const [confirmDelete, setConfirmDelete] = React.useState(null);
 
-  // Состояние для системного промпта
   const [systemPrompt, setSystemPrompt] = React.useState(() => {
     return localStorage.getItem('aiSystemPrompt') || 
       "Ты эксперт-аналитик чемпионата по брейдингу (плетение кос, дреды, брейды, изготовление комплектов для вплета). Пиши профессионально и вежливо. Дай общий связный анализ выступления участника на основе комментариев судей. Не используй маркированные списки или пункты. В конце анализа обязательно отметь замечания комиссара, если они присутствуют.";
@@ -136,6 +135,7 @@ export function Settings({ show, onClose, adminDeviceId }) {
 
   const handleSaveSystemPrompt = () => {
     localStorage.setItem('aiSystemPrompt', systemPrompt);
+    if (onSystemPromptChange) onSystemPromptChange(systemPrompt);
     showToast('Системный промпт сохранён', 'success');
   };
 
@@ -232,7 +232,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
         className: 'bg-white w-full max-w-4xl rounded-[32px] p-8 shadow-2xl space-y-6 border border-gray-100 max-h-[90vh] overflow-y-auto',
         onClick: (e) => e.stopPropagation()
       },
-      // Заголовок
       React.createElement(
         'div',
         { className: 'flex justify-between items-center sticky top-0 bg-white pb-4 border-b border-gray-100' },
@@ -244,7 +243,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
         )
       ),
       
-      // Блок push-уведомлений
       React.createElement(
         'div',
         { className: 'space-y-6' },
@@ -278,12 +276,10 @@ export function Settings({ show, onClose, adminDeviceId }) {
 
       React.createElement('hr', { className: 'border-gray-100' }),
 
-      // Блок управления ключами
       React.createElement(
         'div',
         { className: 'space-y-4' },
         React.createElement('h3', { className: 'text-[11px] font-medium uppercase tracking-widest text-gray-500' }, 'Управление ключами судей'),
-        
         React.createElement(
           'div',
           { className: 'overflow-x-auto' },
@@ -376,7 +372,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
                 )
               )
         ),
-
         React.createElement(
           'div',
           { className: 'flex justify-end mt-4' },
@@ -394,7 +389,6 @@ export function Settings({ show, onClose, adminDeviceId }) {
 
       React.createElement('hr', { className: 'border-gray-100' }),
 
-      // Блок настроек ИИ
       React.createElement(
         'div',
         { className: 'space-y-4' },
