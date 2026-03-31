@@ -968,7 +968,7 @@ ${commentsList || "Нет комментариев."}`;
                       {/* ЛЕВАЯ ЧАСТЬ: номер/город + имя */}
                       <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
                         <div className="flex flex-col flex-shrink-0">
-                          <span className="text-[16px] sm:text-[20px] font-medium leading-none text-gray-900">№ {p.number}</span>
+                          <span className="text-[13px] sm:text-[16px] font-medium leading-none text-gray-900">№ {p.number}</span>
                           <span className="text-[8px] sm:text-[9px] text-gray-400 uppercase tracking-wider mt-0.5 sm:mt-1 leading-none">{p.city}</span>
                         </div>
                         <div className="flex flex-col min-w-0 flex-1">
@@ -985,7 +985,7 @@ ${commentsList || "Нет комментариев."}`;
                         <IconAward size={14} className={isFirst ? 'text-gray-700' : 'text-gray-300'} />
                         <span className="text-[11px] sm:text-[13px] text-gray-700 font-medium whitespace-nowrap">{pIdx + 1} МЕСТО</span>
                         <div className="flex flex-col items-end">
-                          <span className="text-[16px] sm:text-[20px] font-medium text-gray-900 leading-none">{p.avgScore.toFixed(1)}</span>
+                          <span className="text-[13px] sm:text-[16px] font-medium text-gray-900 leading-none">{p.avgScore.toFixed(1)}</span>
                           <span className="text-[6px] sm:text-[7px] text-gray-400 uppercase tracking-wider leading-none mt-0.5">БАЛЛЫ</span>
                         </div>
                         <button onClick={() => openFromAggregated(p)} className="p-1 sm:p-1.5 hover:bg-gray-200 rounded-full transition-all flex-shrink-0">
