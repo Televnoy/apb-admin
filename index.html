@@ -951,11 +951,16 @@ ${commentsList || "Нет комментариев."}`;
 
         <div className="flex flex-wrap gap-5">
           {Object.entries(nominationGroups).map(([nomination, participants]) => (
-            <div key={nomination} className="bg-white rounded-[32px] p-5 sm:p-6 border border-gray-200 flex-1 min-w-[280px] max-w-full md:max-w-[calc(50%-20px)] lg:max-w-[calc(33.333%-20px)]">
-              <div className="mb-3 sm:mb-4 flex items-center justify-between border-b border-gray-100 pb-3 sm:pb-4">
-                <h4 className="text-[11px] sm:text-[12px] tracking-tight leading-tight uppercase break-words pr-2">{nomination}</h4>
-                <span className="text-[8px] sm:text-[9px] text-gray-500 bg-gray-100 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full flex-shrink-0">N={participants.length}</span>
-              </div>
+           
+      <div key={nomination} className="bg-white rounded-[32px] p-5 sm:p-6 border border-gray-200 flex-1 min-w-[280px] max-w-full md:max-w-[calc(50%-20px)] lg:max-w-[calc(33.333%-20px)]">
+  <div className="mb-3 sm:mb-4 flex items-center justify-between border-b border-gray-100 pb-3 sm:pb-4">
+    <h4 className="text-[11px] sm:text-[12px] tracking-tight leading-tight uppercase break-words pr-2">{nomination}</h4>
+    <span className="text-[8px] sm:text-[9px] text-gray-500 bg-gray-100 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full flex-shrink-0">
+      {participants.length} уч.
+    </span>
+  </div>
+  {/* ... остальное содержимое ... */}
+
               <div className="space-y-1.5 sm:space-y-2">
                 {participants.map((p, pIdx) => {
                   const isFirst = pIdx === 0;
