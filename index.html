@@ -956,7 +956,7 @@ ${commentsList || "Нет комментариев."}`;
   <div className="mb-3 sm:mb-4 flex items-center justify-between border-b border-gray-100 pb-3 sm:pb-4">
     <h4 className="text-[11px] sm:text-[12px] tracking-tight leading-tight uppercase break-words pr-2">{nomination}</h4>
     <span className="text-[8px] sm:text-[9px] text-gray-500 bg-gray-100 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full flex-shrink-0">
-      {participants.length} уч.
+      {participants.length} {participants.length === 1 ? 'участник' : (participants.length < 5 ? 'участника' : 'участников')}
     </span>
   </div>
   {/* ... остальное содержимое ... */}
