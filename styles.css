@@ -2,22 +2,22 @@
 
 /* Утоньшаем стандартные границы (1px → 0.5px) */
 .border {
-  border-width: 0.5px;
+  border-width: 0.1px;
 }
 .border-t {
-  border-top-width: 0.5px;
+  border-top-width: 0.1px;
 }
 .border-b {
-  border-bottom-width: 0.5px;
+  border-bottom-width: 0.1px;
 }
 .border-l {
-  border-left-width: 0.5px;
+  border-left-width: 0.1px;
 }
 .border-r {
-  border-right-width: 0.5px;
+  border-right-width: 0.1px;
 }
 .border-2 {
-  border-width: 0px;
+  border-width: 0.1px;
 }
 
 /* фон */
