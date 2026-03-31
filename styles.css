@@ -1,5 +1,13 @@
 /* styles.css — основной файл стилей для АПБ Админ */
 
+/* фон */
+.bg-gray-50 {
+  background-color: #ffffff !important;
+}
+.bg-gray-50\/80 {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+}
+
 /* ---------------------- Базовые стили ---------------------- */
 * {
   font-family: 'Inter', sans-serif;
