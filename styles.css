@@ -1,5 +1,25 @@
 /* styles.css — основной файл стилей для АПБ Админ */
 
+/* Утоньшаем стандартные границы (1px → 0.5px) */
+.border {
+  border-width: 0.5px;
+}
+.border-t {
+  border-top-width: 0.5px;
+}
+.border-b {
+  border-bottom-width: 0.5px;
+}
+.border-l {
+  border-left-width: 0.5px;
+}
+.border-r {
+  border-right-width: 0.5px;
+}
+.border-2 {
+  border-width: 1px;
+}
+
 /* фон */
 .bg-gray-50 {
   background-color: #ffffff !important;
